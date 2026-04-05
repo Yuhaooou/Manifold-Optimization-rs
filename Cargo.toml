@@ -1,0 +1,24 @@
+[package]
+name = "manifold-optimization"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+license = "MIT"
+description = "A Rust library for optimization on manifolds."
+authors = [
+    "Yuhao Jiang <>",
+]
+
+[dependencies]
+rand = "0.9"
+ndarray = { version = "0.17.2" }
+ndarray-linalg = { version = "0.18.1", features = ["openblas-system"] }
+ndarray-rand = "0.16.0"
+argmin = "0.11.0"
+num-traits = "0.2"
+num-complex = "0.4.6"
+bon = "3.9.1"
+derive-new = "0.7.0"
+
+[target.'cfg(windows)'.build-dependencies]
+vcpkg = "0.2.15"
