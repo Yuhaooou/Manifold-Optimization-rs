@@ -129,11 +129,11 @@ impl<R> Field for R where R: Real {}
 
 /// Real-or-complex scalar abstraction used by generic vectors.
 pub trait RCLike: Field + Copy + 'static {
-    // Not like [`Scalar`], [`Scalar::abs`] return [`Scalar::Real`] type, here we just 
-    // return [`Self`] type. It's theoretically ture, because the modulus of a complex number is a
-    // real number, which is still a complex number. Besides, the return type of [`Scalar::abs`] 
-    // is not theoretically equal to [`Self::Real`] type, the theoretical return type should be
-    // somethins like R>=0, which is hard to implement in Rust.
+    // Not like [`Scalar`], where [`Scalar::abs`] returns [`Scalar::Real`] type, here it just 
+    // returns [`Self`] type. The return type here theoretically ture, because the modulus of 
+    // a complex number is a real number, which is still a complex number. Besides, the return type 
+    // of [`Scalar::abs`] is not theoretically equal to [`Self::Real`] type, the theoretical return 
+    // type should be somethings like $\mathbb{R} \ge 0$, which is hard to implement in Rust.
     /// Absolute value (modulus) of the Real (complex) number. Returns the same type of the input.
     fn abs(self) -> Self;
 
