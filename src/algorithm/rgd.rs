@@ -1,7 +1,7 @@
 use crate::algorithm::Status;
 use crate::algorithm::line_search::{BackTrackingParams, back_tracking};
 use crate::manifolds::Manifold;
-use crate::problem::{EGradient, Function, Problem};
+use crate::problem::{FuncWithEGrad, Function, Problem};
 use crate::utils::random_point::RandomOn;
 use crate::utils::traits::Real;
 
@@ -54,8 +54,7 @@ impl<'a, 'b, R, M, F> RGD<'a, 'b, R, M, F>
 where
     R: Real,
     M: Manifold<Field = R> + RandomOn,
-    F: Function<Point = M::Point, Field = R>
-        + EGradient<Point = M::Point, Gradient = M::AmbientPoint>,
+    F: FuncWithEGrad<R, M::Point, M::AmbientPoint>,
 {
     /// Create an RGD solver with default stopping parameters.
     pub fn new(

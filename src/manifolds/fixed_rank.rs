@@ -311,12 +311,12 @@ where
         &self,
         point_a: &PointType<D>,
         point_b: &PointType<D>,
-        tangent_vector_a: &TangentVectorType<D>,
+        tangent_vector1: &TangentVectorType<D>,
     ) -> TangentVectorType<D>
     where
         D: Scalar<Real = D> + ScalarOperand + Real + Lapack,
     {
-        let embedded = self.embedding(point_a, tangent_vector_a);
+        let embedded = self.embedding(point_a, tangent_vector1);
         self.projection(point_b, &embedded)
     }
 

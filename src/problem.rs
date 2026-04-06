@@ -1,6 +1,6 @@
 use crate::manifolds::Manifold;
 use crate::utils::random_point::RandomOn;
-use crate::utils::traits::{Field, RCLike};
+use crate::utils::traits::RCLike;
 
 /// Objective function defined on a manifold point.
 pub trait Function {
@@ -145,18 +145,13 @@ where
 
     #[inline]
     /// Norm induced by manifold metric.
-    pub fn norm(&self, x: &M::Point, v: &M::TangentVector) -> <M::Field as Field>::Real {
+    pub fn norm(&self, x: &M::Point, v: &M::TangentVector) -> M::Field {
         self.manifold.norm(x, v)
     }
 
     #[inline]
     /// Manifold inner product of tangent vectors.
-    pub fn inner(
-        &self,
-        x: &M::Point,
-        v1: &M::TangentVector,
-        v2: &M::TangentVector,
-    ) -> <M::Field as Field>::Real {
+    pub fn inner(&self, x: &M::Point, v1: &M::TangentVector, v2: &M::TangentVector) -> M::Field {
         self.manifold.inner(x, v1, v2)
     }
 
@@ -176,7 +171,7 @@ where
 impl<M, F> Problem<'_, M, F>
 where
     M: Manifold,
-    F: Function<Point = M::Point, Field = <M::Field as Field>::Real>
+    F: Function<Point = M::Point, Field = M::Field>
         + EGradient<Point = M::Point, Gradient = M::AmbientPoint>,
 {
     #[inline]
@@ -201,7 +196,7 @@ where
 impl<M, F> Problem<'_, M, F>
 where
     M: Manifold,
-    F: Function<Point = M::Point, Field = <M::Field as Field>::Real>
+    F: Function<Point = M::Point, Field = M::Field>
         + EGradient<Point = M::Point, Gradient = M::AmbientPoint>
         + EHessian<Point = M::Point, Direction = M::TangentVector, Hessian = M::AmbientPoint>,
 {
@@ -234,7 +229,7 @@ where
 impl<M, F> Problem<'_, M, F>
 where
     M: Manifold + RandomOn,
-    F: Function<Point = M::Point, Field = <M::Field as Field>::Real>,
+    F: Function<Point = M::Point, Field = M::Field>,
 {
     // pub fn set_random_initial_point(mut self) -> Self {
     //     self.initial_point = Some(self.manifold.random_point());

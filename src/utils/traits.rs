@@ -3,6 +3,7 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
+use ndarray_linalg::Scalar;
 use num_complex::{Complex32 as c32, Complex64 as c64};
 use num_traits::{Float as NumFloat, Num, NumCast, One, Zero};
 
@@ -118,37 +119,31 @@ impl Real for f32 {
 pub trait Field:
     Zero + One + Add<Output = Self> + Sub<Output = Self> + Mul<Output = Self> + Debug + Clone
 {
-    /// Real part / associated real scalar type.
-    type Real: Real;
 }
 
-impl Field for c64 {
-    type Real = f64;
-}
+impl Field for c64 {}
 
-impl Field for c32 {
-    type Real = f32;
-}
+impl Field for c32 {}
 
-impl<R> Field for R
-where
-    R: Real,
-{
-    type Real = R;
-}
+impl<R> Field for R where R: Real {}
 
 /// Real-or-complex scalar abstraction used by generic vectors.
 pub trait RCLike: Field + Copy + 'static {
-    /// Magnitude.
-    fn abs(self) -> Self::Real;
+    // Not like [`Scalar`], [`Scalar::abs`] return [`Scalar::Real`] type, here we just 
+    // return [`Self`] type. It's theoretically ture, because the modulus of a complex number is a
+    // real number, which is still a complex number. Besides, the return type of [`Scalar::abs`] 
+    // is not theoretically equal to [`Self::Real`] type, the theoretical return type should be
+    // somethins like R>=0, which is hard to implement in Rust.
+    /// Absolute value (modulus) of the Real (complex) number. Returns the same type of the input.
+    fn abs(self) -> Self;
 
     /// Principal square root.
     fn sqrt(self) -> Self;
 }
 
 impl RCLike for c64 {
-    fn abs(self) -> Self::Real {
-        c64::norm(self)
+    fn abs(self) -> Self {
+        c64::norm(self).as_c()
     }
 
     fn sqrt(self) -> Self {
@@ -157,8 +152,8 @@ impl RCLike for c64 {
 }
 
 impl RCLike for c32 {
-    fn abs(self) -> Self::Real {
-        c32::norm(self)
+    fn abs(self) -> Self {
+        c32::norm(self).as_c()
     }
 
     fn sqrt(self) -> Self {

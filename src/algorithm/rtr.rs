@@ -251,29 +251,10 @@ where
             let (step, next_subproblem_value, inner_iters) =
                 self.truncate_cg(&current_point, &-grad, radius);
             let next_point = self.problem.retraction(&current_point, &step);
-
-            // unsafe {
-            //     let point = &next_point as *const M::Point as *const ndarray::Array1<f64>;
-            //     let point = (&*point).clone();
-
-            //     println!("{}", point.norm_l2());
-            // }
-
             let next_value = self.problem.value(&next_point);
 
             grad = self.problem.gradient(&next_point);
             grad_norm = self.problem.norm(&next_point, &grad);
-
-            if self.verbose > 0 {
-                println!(
-                    "Iter: {}, Inner iters: {}, Cost: {:.8e}, Grad Norm: {:.8e}, Radius: {:.8e}",
-                    iter,
-                    inner_iters.map_or("max".to_string(), |x| x.to_string()),
-                    next_value.to_f64(),
-                    grad_norm.to_f64(),
-                    radius.to_f64()
-                );
-            }
 
             if self.problem.norm(&current_point, &step) < self.min_step_size {
                 return RTRResult::new(
@@ -308,6 +289,18 @@ where
                 || (self.problem.norm(&current_point, &step) - radius).abs() < R::epsilon()
             {
                 radius = R::min(radius * R::two(), self.max_radius);
+            }
+
+            if self.verbose > 0 {
+                println!(
+                    "Iter: {}, Inner iters: {}, Cost: {:.8e}, Grad Norm: {:.8e}, Radius: {:.8e}, rho: {:.4}",
+                    iter,
+                    inner_iters.map_or("max".to_string(), |x| x.to_string()),
+                    next_value,
+                    grad_norm,
+                    radius,
+                    rho
+                );
             }
         }
 

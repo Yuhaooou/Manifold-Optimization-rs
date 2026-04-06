@@ -1,4 +1,4 @@
-use crate::utils::traits::{Field, RCLike, Vector};
+use crate::utils::traits::{RCLike, Vector};
 
 /// Generic manifold interface used by optimization algorithms.
 pub trait Manifold: Clone {
@@ -43,10 +43,10 @@ pub trait Manifold: Clone {
     fn inner(
         &self,
         point: &Self::Point,
-        tangent_vector_a: &Self::TangentVector,
-        tangent_vector_b: &Self::TangentVector,
-    ) -> <Self::Field as Field>::Real {
-        let _ = (point, tangent_vector_a, tangent_vector_b);
+        tangent_vector1: &Self::TangentVector,
+        tangent_vector2: &Self::TangentVector,
+    ) -> Self::Field {
+        let _ = (point, tangent_vector1, tangent_vector2);
         unimplemented!("Metric not implemented for this manifold");
     }
 
@@ -55,7 +55,7 @@ pub trait Manifold: Clone {
         &self,
         point: &Self::Point,
         tangent_vector: &Self::TangentVector,
-    ) -> <Self::Field as Field>::Real {
+    ) -> Self::Field {
         (self.inner(point, tangent_vector, tangent_vector)).sqrt()
     }
 

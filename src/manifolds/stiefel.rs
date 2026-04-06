@@ -95,10 +95,10 @@ where
     fn inner(
         &self,
         _point: &Self::Point,
-        tangent_vector_a: &Array2<D>,
-        tangent_vector_b: &Array2<D>,
+        tangent_vector1: &Array2<D>,
+        tangent_vector2: &Array2<D>,
     ) -> D {
-        tangent_vector_a.inner(tangent_vector_b)
+        tangent_vector1.inner(tangent_vector2)
     }
 
     fn projection(&self, point: &Array2<D>, ambient_point: &Self::TangentVector) -> Self::Point {
