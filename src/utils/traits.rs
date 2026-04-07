@@ -45,10 +45,10 @@ pub trait Real:
         Self::from_f64(0.5)
     }
 
-    /// Return 2.0.
-    fn two() -> Self {
-        Self::from_f64(2.0)
-    }
+    fn addi(self, rhs: i32) -> Self;
+    fn subi(self, rhs: i32) -> Self;
+    fn muli(self, rhs: i32) -> Self;
+    fn divi(self, rhs: i32) -> Self;
 
     // fn max(self, other: Self) -> Self {
     //     NumFloat::max(self, other)
@@ -95,6 +95,22 @@ impl Real for f64 {
     fn to_f32(self) -> f32 {
         self as f32
     }
+
+    fn addi(self, rhs: i32) -> Self {
+        self + (rhs as f64)
+    }
+
+    fn subi(self, rhs: i32) -> Self {
+        self - (rhs as f64)
+    }
+
+    fn muli(self, rhs: i32) -> Self {
+        self * (rhs as f64)
+    }
+
+    fn divi(self, rhs: i32) -> Self {
+        self / (rhs as f64)
+    }
 }
 
 impl Real for f32 {
@@ -113,6 +129,22 @@ impl Real for f32 {
     fn to_f32(self) -> f32 {
         self
     }
+
+    fn addi(self, rhs: i32) -> Self {
+        self + (rhs as f32)
+    }
+
+    fn subi(self, rhs: i32) -> Self {
+        self - (rhs as f32)
+    }
+
+    fn muli(self, rhs: i32) -> Self {
+        self * (rhs as f32)
+    }
+
+    fn divi(self, rhs: i32) -> Self {
+        self / (rhs as f32)
+    }
 }
 
 /// Scalar field abstraction used by vectors and manifolds.
@@ -129,10 +161,10 @@ impl<R> Field for R where R: Real {}
 
 /// Real-or-complex scalar abstraction used by generic vectors.
 pub trait RCLike: Field + Copy + 'static {
-    // Not like [`Scalar`], where [`Scalar::abs`] returns [`Scalar::Real`] type, here it just 
-    // returns [`Self`] type. The return type here theoretically ture, because the modulus of 
-    // a complex number is a real number, which is still a complex number. Besides, the return type 
-    // of [`Scalar::abs`] is not theoretically equal to [`Self::Real`] type, the theoretical return 
+    // Not like [`Scalar`], where [`Scalar::abs`] returns [`Scalar::Real`] type, here it just
+    // returns [`Self`] type. The return type here theoretically ture, because the modulus of
+    // a complex number is a real number, which is still a complex number. Besides, the return type
+    // of [`Scalar::abs`] is not theoretically equal to [`Self::Real`] type, the theoretical return
     // type should be somethings like $\mathbb{R} \ge 0$, which is hard to implement in Rust.
     /// Absolute value (modulus) of the Real (complex) number. Returns the same type of the input.
     fn abs(self) -> Self;

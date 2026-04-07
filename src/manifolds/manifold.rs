@@ -1,6 +1,8 @@
 use crate::utils::traits::{RCLike, Vector};
 
 /// Generic manifold interface used by optimization algorithms.
+/// The reason for methods like [`Self::inner`] needs to be method instead of associated functions 
+/// is that it may choose which inner product to use by the field in the manifold struct.
 pub trait Manifold: Clone {
     /// Scalar type used for geometry computations on this manifold.
     type Field: RCLike;

@@ -2,7 +2,7 @@ use derive_new::new;
 
 use crate::algorithm::Status;
 use crate::manifolds::Manifold;
-use crate::problem::{FuncWithEGradEHess, Function, Problem};
+use crate::problem::{FuncWithEGrad, Problem};
 use crate::utils::random_point::RandomOn;
 use crate::utils::traits::{Real, Vector};
 
@@ -13,18 +13,33 @@ const DEFAULT_KAPPA: f64 = 0.1;
 const DEFAULT_THETA: f64 = 1.0;
 const DEFAULT_MAX_INNER_ITERATIONS: usize = 500;
 
-/// Default Hessian-vector product callback type for RTR.
-type HessianFunc<M> =
-    fn(&<M as Manifold>::Point, &<M as Manifold>::TangentVector) -> <M as Manifold>::TangentVector;
+pub trait RTRHessian<M: Manifold> {
+    fn use_approx(&self) -> bool {
+        false
+    }
+
+    fn euclidean_hessian(&self, x: &M::Point, u: &M::TangentVector) -> M::AmbientPoint {
+        let _ = (x, u);
+        unimplemented!("euclidean_hessian is not implemented for this function")
+    }
+
+    fn hessian_approx(
+        &self,
+        point: &M::Point,
+        tangent_vector: &M::TangentVector,
+    ) -> M::TangentVector {
+        let _ = (point, tangent_vector);
+        unimplemented!("hessian_approx is not implemented for this function")
+    }
+}
 
 // #[derive(Builder)]
 /// Riemannian Trust-Region solver.
-pub struct RTR<'a, 'b, R, M, F, H = HessianFunc<M>>
+pub struct RTR<'a, 'b, R, M, F>
 where
     R: Real,
     M: Manifold,
-    F: Function<Point = M::Point, Field = R>,
-    H: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
+    F: FuncWithEGrad<R, M::Point, M::AmbientPoint> + RTRHessian<M>,
 {
     problem: &'a mut Problem<'b, M, F>,
     min_grad_norm: R,
@@ -35,7 +50,6 @@ where
     kappa: R,
     theta: R,
     max_inner_iterations: usize,
-    hessian_approx: Option<H>,
     verbose: u8,
 }
 
@@ -70,7 +84,7 @@ impl<'a, 'b, R, M, F> RTR<'a, 'b, R, M, F>
 where
     R: Real,
     M: Manifold,
-    F: FuncWithEGradEHess<R, M::Point, M::AmbientPoint, M::TangentVector, M::AmbientPoint>,
+    F: FuncWithEGrad<R, M::Point, M::AmbientPoint> + RTRHessian<M>,
 {
     /// Create an RTR solver.
     ///
@@ -87,18 +101,16 @@ where
             kappa: R::from_f64(DEFAULT_KAPPA),
             theta: R::from_f64(DEFAULT_THETA),
             max_inner_iterations: DEFAULT_MAX_INNER_ITERATIONS,
-            hessian_approx: None,
             verbose: 1,
         }
     }
 }
 
-impl<'a, 'b, R, M, F, H> RTR<'a, 'b, R, M, F, H>
+impl<'a, 'b, R, M, F> RTR<'a, 'b, R, M, F>
 where
     R: Real,
     M: Manifold<Field = R> + RandomOn,
-    F: FuncWithEGradEHess<R, M::Point, M::AmbientPoint, M::TangentVector, M::AmbientPoint>,
-    H: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
+    F: FuncWithEGrad<R, M::Point, M::AmbientPoint> + RTRHessian<M>,
 {
     /// Set minimum gradient norm stopping threshold.
     pub fn set_min_grad_norm(mut self, min_grad_norm: R) -> Self {
@@ -142,33 +154,18 @@ where
         self
     }
 
-    /// Replace exact Hessian-vector product with a user-provided approximation.
-    pub fn set_hessian_approx<H2>(self, hess_approx: H2) -> RTR<'a, 'b, R, M, F, H2>
-    where
-        H2: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
-    {
-        RTR {
-            problem: self.problem,
-            min_grad_norm: self.min_grad_norm,
-            min_step_size: self.min_step_size,
-            max_iterations: self.max_iterations,
-            max_radius: self.max_radius,
-            threshold: self.threshold,
-            kappa: self.kappa,
-            theta: self.theta,
-            max_inner_iterations: self.max_inner_iterations,
-            hessian_approx: Some(hess_approx),
-            verbose: self.verbose,
+    fn get_hessian(&self, point: &M::Point, tangent_vector: &M::TangentVector) -> M::TangentVector {
+        if self.problem.function.use_approx() {
+            return self.problem.function.hessian_approx(point, tangent_vector);
         }
-    }
-
-    #[inline]
-    fn get_hessian(&self, point: &M::Point, tangent_vec: &M::TangentVector) -> M::TangentVector {
-        if let Some(hess_approx) = &self.hessian_approx {
-            hess_approx(point, tangent_vec)
-        } else {
-            self.problem.hessian(point, tangent_vec)
-        }
+        let egrad = self.problem.euclidean_gradient(point);
+        let ehess = self
+            .problem
+            .function
+            .euclidean_hessian(point, tangent_vector);
+        self.problem
+            .manifold
+            .ehess_to_rhess(point, tangent_vector, &egrad, &ehess)
     }
 
     // subproblem: m(s) = .5<s, Hs>_x - <b, s>_x, ||s|| <= radius, where b = -gradf_x.
@@ -201,13 +198,10 @@ where
 
             if p_hp <= R::zero() || self.problem.norm(point, &v_next) >= radius {
                 let inner_v_p = self.problem.inner(point, &v, &p);
-                let t = -inner_v_p * R::two()
-                    + R::sqrt(
-                        inner_v_p.powi(2)
-                            - R::from_f64(4.)
-                                * self.problem.inner(point, &p, &p)
-                                * (self.problem.inner(point, &v, &v) - radius.powi(2)),
-                    );
+                let norm_p_sq = self.problem.norm(point, &p).powi(2);
+                let norm_v_sq = self.problem.norm(point, &v).powi(2);
+                let tmp = norm_p_sq * (norm_v_sq - radius.powi(2)).muli(4);
+                let t = (-inner_v_p + (inner_v_p.powi(2) - tmp).sqrt()) / norm_p_sq;
 
                 v = v + p * t;
                 let subproblem_value = subproblem_func(&v);
@@ -288,7 +282,7 @@ where
             } else if rho > R::from_f64(0.75)
                 || (self.problem.norm(&current_point, &step) - radius).abs() < R::epsilon()
             {
-                radius = R::min(radius * R::two(), self.max_radius);
+                radius = R::min(radius.muli(2), self.max_radius);
             }
 
             if self.verbose > 0 {
@@ -296,7 +290,7 @@ where
                     "Iter: {}, Inner iters: {}, Cost: {:.8e}, Grad Norm: {:.8e}, Radius: {:.8e}, rho: {:.4}",
                     iter,
                     inner_iters.map_or("max".to_string(), |x| x.to_string()),
-                    next_value,
+                    current_value,
                     grad_norm,
                     radius,
                     rho

@@ -1,11 +1,10 @@
 use ndarray::prelude::*;
-use ndarray_linalg::Scalar;
 
-use crate::utils::traits::Real;
+use crate::utils::traits::{RCLike, Real};
 
 /// Inner product extension trait for ndarray arrays.
 pub trait InnerProduct {
-    type Elem: Scalar;
+    type Elem: RCLike;
     type IxN: Dimension;
 
     /// Return the Euclidean inner product with `rhs`.
@@ -14,7 +13,7 @@ pub trait InnerProduct {
 
 impl<A, IxN> InnerProduct for Array<A, IxN>
 where
-    A: Real + Scalar,
+    A: Real,
     IxN: Dimension,
 {
     type Elem = A;

@@ -49,7 +49,10 @@ pub trait EHessian {
     type Hessian;
 
     /// Compute Euclidean Hessian action at `x` along direction `u`.
-    fn euclidean_hessian(&self, x: &Self::Point, u: &Self::Direction) -> Self::Hessian;
+    fn euclidean_hessian(&self, x: &Self::Point, u: &Self::Direction) -> Self::Hessian {
+        let _ = (x, u);
+        unimplemented!("Euclidean Hessian is not implemented for this function.")
+    }
 }
 
 /// Marker trait for functions with Euclidean Hessian.
@@ -89,9 +92,9 @@ where
     M: Manifold,
     F: Function<Point = M::Point>,
 {
-    manifold: &'a M,
-    function: &'a F,
-    initial_point: Option<M::Point>,
+    pub(crate) manifold: &'a M,
+    pub(crate) function: &'a F,
+    pub(crate) initial_point: Option<M::Point>,
     // pub(crate) has_rgrad: bool,
     // pub(crate) has_rhess: bool,
 }
