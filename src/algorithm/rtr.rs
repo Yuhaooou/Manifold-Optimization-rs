@@ -14,8 +14,10 @@ const DEFAULT_THETA: f64 = 1.0;
 const DEFAULT_MAX_INNER_ITERATIONS: usize = 500;
 
 pub trait RTRHessian<M: Manifold> {
+    const USE_APPROX: bool = false;
+
     fn use_approx(&self) -> bool {
-        false
+        Self::USE_APPROX
     }
 
     fn euclidean_hessian(&self, x: &M::Point, u: &M::TangentVector) -> M::AmbientPoint {
