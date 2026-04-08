@@ -11,8 +11,3 @@ pub mod algorithm;
 pub mod manifolds;
 pub mod problem;
 pub mod utils;
-
-// pub use algorithm::*;
-// pub use manifolds::*;
-// pub use problem::*;
-// pub use utils::*;

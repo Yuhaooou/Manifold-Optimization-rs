@@ -4,11 +4,9 @@ use ndarray_rand::{RandomExt, rand_distr::Uniform};
 use rand::distr::uniform::SampleUniform;
 
 use crate::manifolds::Manifold;
-use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, Exponential};
+use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, Exp, RandomPoint};
 use crate::utils::traits::Real;
-use crate::utils::{
-    inner_product::InnerProduct, random_point::RandomOn, tools::get_scalar_from_float,
-};
+use crate::utils::{inner_product::InnerProduct, tools::get_scalar_from_float};
 
 #[derive(Debug, Clone)]
 /// Grassmann manifold `Gr(n, p)` of `p`-dimensional subspaces in `R^n`.
@@ -139,7 +137,7 @@ where
     }
 }
 
-impl<D> RandomOn for Grassmann<D>
+impl<D> RandomPoint for Grassmann<D>
 where
     D: Scalar + ScalarOperand + Real + Lapack<Real = D> + SampleUniform,
 {
@@ -156,11 +154,11 @@ where
     }
 }
 
-impl<D> Exponential for Grassmann<D>
+impl<D> Exp for Grassmann<D>
 where
     D: Scalar + ScalarOperand + Real + Lapack<Real = D>,
 {
-    fn exponential_map(
+    fn exp(
         &self,
         point: &Self::Point,
         tangent_vector: &Self::TangentVector,

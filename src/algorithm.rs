@@ -1,9 +1,5 @@
 //! Optimization algorithms and shared status types.
 
-// use crate::manifolds::Manifold;
-// use crate::problem::{Gradient, Problom};
-// use crate::utils::Float;
-
 pub mod line_search;
 pub mod rgd;
 pub mod rtr;

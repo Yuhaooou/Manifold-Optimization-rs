@@ -4,7 +4,6 @@ use crate::algorithm::Status;
 use crate::manifolds::Manifold;
 use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess};
 use crate::problem::{FuncWithEGrad, Problem};
-use crate::utils::random_point::RandomOn;
 use crate::utils::traits::{Real, Vector};
 
 const DEFAULT_MIN_GRAD_NORM: f64 = 1e-6;
@@ -112,7 +111,7 @@ where
 impl<'a, 'b, R, M, F> RTR<'a, 'b, R, M, F>
 where
     R: Real,
-    M: Manifold<Field = R> + RandomOn + EGradToRGrad + EHessToRHess,
+    M: Manifold<Field = R> + EGradToRGrad + EHessToRHess,
     F: FuncWithEGrad<R, M::Point, M::AmbientPoint> + RTRHessian<M>,
 {
     /// Set minimum gradient norm stopping threshold.
@@ -229,7 +228,7 @@ where
 
     /// Run trust-region optimization from the problem's initial point.
     pub fn run(&mut self, mut radius: M::Field) -> RTRResult<R, M> {
-        let mut current_point = self.problem.get_or_init_initial_point().clone();
+        let mut current_point = self.problem.get_initial_point().clone();
         let mut current_value = self.problem.value(&current_point);
         let mut grad = self.problem.gradient(&current_point);
         let mut grad_norm = self.problem.norm(&current_point, &grad);

@@ -1,6 +1,5 @@
 use crate::manifolds::Manifold;
-use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess};
-use crate::utils::random_point::RandomOn;
+use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, RandomPoint};
 use crate::utils::traits::RCLike;
 
 /// Objective function defined on a manifold point.
@@ -92,7 +91,7 @@ where
 {
     pub(crate) manifold: &'a M,
     pub(crate) function: &'a F,
-    pub(crate) initial_point: Option<M::Point>,
+    initial_point: M::Point,
 }
 
 impl<'a, M, F> Problem<'a, M, F>
@@ -101,11 +100,27 @@ where
     F: Function<Point = M::Point>,
 {
     /// Create a new optimization problem.
-    pub fn new(manifold: &'a M, function: &'a F) -> Self {
+    pub fn new_with_init_point(manifold: &'a M, function: &'a F, init_point: M::Point) -> Self {
         Problem {
             manifold,
             function,
-            initial_point: None,
+            initial_point: init_point,
+        }
+    }
+}
+
+impl<'a, M, F> Problem<'a, M, F>
+where
+    M: Manifold + RandomPoint,
+    F: Function<Point = M::Point>,
+{
+    /// Create a new optimization problem.
+    pub fn new(manifold: &'a M, function: &'a F) -> Self {
+        let init_point = manifold.random_point();
+        Problem {
+            manifold,
+            function,
+            initial_point: init_point,
         }
     }
 }
@@ -115,23 +130,9 @@ where
     M: Manifold,
     F: Function<Point = M::Point>,
 {
-    /// Set the initial point for optimization.
-    ///
-    /// This is optional when the manifold also implements `RandomOn`.
-    pub fn set_initial_point(mut self, init_point: M::Point) -> Self {
-        println!("Set initial point.");
-        self.initial_point = Some(init_point);
-        self
-    }
-
     /// Get the configured initial point.
-    ///
-    /// # Panics
-    /// Panics if initial point has not been set.
     pub fn get_initial_point(&self) -> &M::Point {
-        self.initial_point
-            .as_ref()
-            .expect("Initial point is not set")
+        &self.initial_point
     }
 
     #[inline]
@@ -220,27 +221,5 @@ where
         let egrad = self.euclidean_gradient(x);
         let ehess = self.euclidean_hessian(x, u);
         self.ehess_to_rhess(x, u, &egrad, &ehess)
-    }
-}
-
-impl<M, F> Problem<'_, M, F>
-where
-    M: Manifold + RandomOn,
-    F: Function<Point = M::Point, Field = M::Field>,
-{
-    // pub fn set_random_initial_point(mut self) -> Self {
-    //     self.initial_point = Some(self.manifold.random_point());
-    //     self
-    // }
-
-    /// Return initial point, or lazily initialize it with a random point.
-    ///
-    /// Useful for algorithms that support random initialization by default.
-    pub fn get_or_init_initial_point(&mut self) -> &M::Point {
-        if self.initial_point.is_none() {
-            println!("Set initial point.");
-            self.initial_point = Some(self.manifold.random_point());
-        }
-        self.get_initial_point()
     }
 }

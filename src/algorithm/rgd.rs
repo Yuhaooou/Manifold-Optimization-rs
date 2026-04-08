@@ -3,7 +3,6 @@ use crate::algorithm::line_search::{BackTrackingParams, back_tracking};
 use crate::manifolds::Manifold;
 use crate::manifolds::manifold::EGradToRGrad;
 use crate::problem::{FuncWithEGrad, Function, Problem};
-use crate::utils::random_point::RandomOn;
 use crate::utils::traits::Real;
 
 const DEFAULT_MIN_GRAD_NORM: f64 = 1e-8;
@@ -54,7 +53,7 @@ where
 impl<'a, 'b, R, M, F> RGD<'a, 'b, R, M, F>
 where
     R: Real,
-    M: Manifold<Field = R> + RandomOn + EGradToRGrad,
+    M: Manifold<Field = R> + EGradToRGrad,
     F: FuncWithEGrad<R, M::Point, M::AmbientPoint>,
 {
     /// Create an RGD solver with default stopping parameters.
@@ -98,7 +97,7 @@ where
 
     /// Run optimization until one stopping criterion is met.
     pub fn run(&mut self) -> RGDResult<R, M> {
-        let mut current_point = self.problem.get_or_init_initial_point().clone();
+        let mut current_point = self.problem.get_initial_point().clone();
         let mut current_value = self.problem.value(&current_point);
         let mut grad = self.problem.gradient(&current_point);
         let mut grad_norm = self.problem.norm(&current_point, &grad);

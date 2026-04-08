@@ -16,7 +16,7 @@ pub trait Manifold: Clone {
     /// Ambient-space representation type used for projections and Euclidean derivatives.
     type AmbientPoint: Clone;
 
-    /// Return a canonical base point on the manifold.
+    /// Return a specific point on the manifold.
     fn base_point(&self) -> Self::Point {
         unimplemented!("Base point not implemented for this manifold");
     }
@@ -67,11 +67,23 @@ pub trait EHessToRHess: Manifold {
     ) -> Self::TangentVector;
 }
 
-pub trait Exponential: Manifold {
+pub trait Exp: Manifold {
     /// Exponential map (exact geodesic step), when available.
-    fn exponential_map(
-        &self,
-        point: &Self::Point,
-        tangent_vector: &Self::TangentVector,
-    ) -> Self::Point;
+    fn exp(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point;
+}
+
+pub trait Log: Manifold {
+    /// Logarithm map (inverse of exponential map), when available.
+    fn log(&self, point: &Self::Point, other: &Self::Point) -> Self::TangentVector;
+}
+
+/// Trait for manifolds that can sample random points.
+pub trait RandomPoint: Manifold {
+    /// Generate a random point on the manifold.
+    fn random_point(&self) -> Self::Point;
+}
+
+pub trait RandomTangentVector: Manifold {
+    /// Generate a random tangent vector at `point`.
+    fn random_tangent_vector(&self, point: &Self::Point) -> Self::TangentVector;
 }

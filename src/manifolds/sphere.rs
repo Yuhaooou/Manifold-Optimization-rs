@@ -4,9 +4,9 @@ use ndarray_rand::{RandomExt, rand_distr::Uniform};
 use rand::distr::uniform::SampleUniform;
 
 use crate::manifolds::Manifold;
-use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess};
+use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, RandomPoint};
+use crate::utils::tools::get_scalar_from_float;
 use crate::utils::traits::{RCLike, Real};
-use crate::utils::{random_point::RandomOn, tools::get_scalar_from_float};
 
 #[derive(Debug, Clone)]
 /// Sphere manifold $S^{n-1}$ embedded in Euclidean space.
@@ -96,7 +96,7 @@ where
     }
 }
 
-impl<D> RandomOn for Sphere<D>
+impl<D> RandomPoint for Sphere<D>
 where
     D: Real + Scalar + ScalarOperand + SampleUniform + Lapack,
 {

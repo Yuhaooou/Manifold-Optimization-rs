@@ -4,11 +4,10 @@ use ndarray_rand::{RandomExt, rand_distr::Uniform};
 use rand::distr::uniform::SampleUniform;
 
 use crate::manifolds::Manifold;
-use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess};
+use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, RandomPoint};
 use crate::utils::traits::{RCLike, Real};
 use crate::utils::{
     inner_product::InnerProduct,
-    random_point::RandomOn,
     tools::{get_scalar_from_float, mat_sym, qr},
 };
 
@@ -31,6 +30,7 @@ where
 {
     /// Create `St(n, p)` with default QR retraction.
     pub fn new(n: usize, p: usize) -> Self {
+        assert!(n >= p && p >= 1, "Need n >= p >= 1");
         Stiefel {
             name: format!("Stiefel manifold St({},{})", n, p),
             n,
@@ -103,12 +103,10 @@ where
     }
 
     fn retraction(&self, point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
-        if self.retraction_type == 0 {
-            Self::retraction_qr(point, tangent_vector)
-        } else if self.retraction_type == 1 {
-            Self::retraction_polar(point, tangent_vector)
-        } else {
-            panic!("Invalid retraction type")
+        match self.retraction_type {
+            0 => Self::retraction_qr(point, tangent_vector),
+            1 => Self::retraction_polar(point, tangent_vector),
+            _ => unimplemented!("Invalid retraction type"),
         }
     }
 }
@@ -138,7 +136,7 @@ where
     }
 }
 
-impl<D> RandomOn for Stiefel<D>
+impl<D> RandomPoint for Stiefel<D>
 where
     D: Real + Scalar + ScalarOperand + SampleUniform + Lapack,
 {
