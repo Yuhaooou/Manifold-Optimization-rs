@@ -1,5 +1,5 @@
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::{Lapack, Norm, Scalar};
+use ndarray_linalg::{Lapack, Norm};
 use ndarray_rand::RandomExt;
 use rand::{
     Rng,
@@ -42,7 +42,7 @@ where
 
 impl<D> Manifold for Sphere<D>
 where
-    D: Real + ScalarOperand + Scalar,
+    D: Real + ScalarOperand,
 {
     type Field = D;
     type Point = Array1<D>;
@@ -74,13 +74,13 @@ where
 
     fn retraction(&self, point: &Array1<D>, tangent_vector: &Array1<D>) -> Array1<D> {
         let res = point + tangent_vector;
-        &res / <D as Scalar>::sqrt(res.dot(&res))
+        &res / D::sqrt(res.dot(&res))
     }
 }
 
 impl<D> EGradToRGrad for Sphere<D>
 where
-    D: Real + ScalarOperand + Scalar,
+    D: Real + ScalarOperand,
 {
     fn egrad_to_rgrad(&self, point: &Array1<D>, egrad: &Array1<D>) -> Array1<D> {
         self.projection(point, egrad)
@@ -89,7 +89,7 @@ where
 
 impl<D> EHessToRHess for Sphere<D>
 where
-    D: Real + ScalarOperand + Scalar,
+    D: Real + ScalarOperand,
 {
     fn ehess_to_rhess(
         &self,
@@ -104,7 +104,7 @@ where
 
 impl<D> RandomPoint for Sphere<D>
 where
-    D: Real + Scalar + ScalarOperand + SampleUniform + Lapack,
+    D: Real + ScalarOperand + SampleUniform + Lapack,
 {
     /// Sample a random point and normalize it onto the sphere.
     fn random_point(&self) -> Array1<D> {

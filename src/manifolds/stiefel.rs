@@ -1,5 +1,5 @@
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::{Lapack, SVD, Scalar};
+use ndarray_linalg::{Lapack, SVD};
 use ndarray_rand::RandomExt;
 use rand::Rng;
 use rand_distr::{Distribution, StandardNormal};
@@ -53,14 +53,14 @@ where
 
     fn retraction_qr(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D>
     where
-        D: Scalar + ScalarOperand + Lapack + Real,
+        D: Lapack + Real,
     {
         qr(&(point + tangent_vector)).unwrap()
     }
 
     fn retraction_polar(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D>
     where
-        D: Scalar + ScalarOperand + Lapack + Real,
+        D: Lapack + Real,
     {
         let (u, _, vt) = (point + tangent_vector).svd(true, true).unwrap();
         u.unwrap().dot(&vt.unwrap())
@@ -69,7 +69,7 @@ where
 
 impl<D> Manifold for Stiefel<D>
 where
-    D: Real + ScalarOperand + Scalar + Lapack,
+    D: Real + ScalarOperand + Lapack,
 {
     type Point = Array2<D>;
     type TangentVector = Array2<D>;
@@ -113,7 +113,7 @@ where
 
 impl<D> EGradToRGrad for Stiefel<D>
 where
-    D: Real + ScalarOperand + Scalar + Lapack,
+    D: Real + ScalarOperand + Lapack,
 {
     fn egrad_to_rgrad(&self, point: &Array2<D>, egrad: &Array2<D>) -> Array2<D> {
         egrad - point.dot(&mat_sym(&point.t().dot(egrad)))
@@ -122,7 +122,7 @@ where
 
 impl<D> EHessToRHess for Stiefel<D>
 where
-    D: Real + ScalarOperand + Scalar + Lapack,
+    D: Real + ScalarOperand + Lapack,
 {
     fn ehess_to_rhess(
         &self,
@@ -139,7 +139,7 @@ where
 // Q: Is standard normal randomly enough after QR?
 impl<D> RandomPoint for Stiefel<D>
 where
-    D: Real + Scalar + ScalarOperand + Lapack,
+    D: Real + ScalarOperand + Lapack,
     StandardNormal: Distribution<D>,
 {
     /// Sample a random matrix and retract to the manifold.

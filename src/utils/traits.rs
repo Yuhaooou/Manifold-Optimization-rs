@@ -153,7 +153,19 @@ impl Real for f32 {
 
 /// Scalar field abstraction used by vectors and manifolds.
 pub trait Field:
-    Zero + One + Add<Output = Self> + Sub<Output = Self> + Mul<Output = Self> + Debug + Clone
+    Zero
+    + One
+    + Add<Output = Self>
+    + Sub<Output = Self>
+    + Mul<Output = Self>
+    + Div<Output = Self>
+    + Neg<Output = Self>
+    + AddAssign
+    + SubAssign
+    + MulAssign
+    + DivAssign
+    + Debug
+    + Clone
 {
 }
 

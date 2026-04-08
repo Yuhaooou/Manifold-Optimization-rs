@@ -1,19 +1,19 @@
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::{Lapack, Norm, SVD, Scalar};
+use ndarray_linalg::{Lapack, SVD, Scalar};
 use ndarray_rand::RandomExt;
 use rand::Rng;
 use rand_distr::{Distribution, StandardNormal};
 
 use crate::manifolds::Manifold;
 use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, Exp, RandomPoint};
+use crate::utils::inner_product::InnerProduct;
 use crate::utils::traits::Real;
-use crate::utils::{inner_product::InnerProduct, tools::get_scalar_from_float};
 
 #[derive(Debug, Clone)]
 /// Grassmann manifold `Gr(n, p)` of `p`-dimensional subspaces in `R^n`.
 pub struct Grassmann<D>
 where
-    D: Real + Scalar + ScalarOperand,
+    D: Real + ScalarOperand,
 {
     name: String,
     n: usize,
@@ -23,7 +23,7 @@ where
 
 impl<D> Grassmann<D>
 where
-    D: Real + Scalar + ScalarOperand,
+    D: Real + ScalarOperand,
 {
     /// Create `Gr(n, p)` with `n >= p >= 1`.
     pub fn new(n: usize, p: usize) -> Self {
@@ -36,23 +36,23 @@ where
         }
     }
 
-    /// Return a typical distance scale used in trust-region methods.
-    pub fn typical_dist(&self) -> D
-    where
-        D: Real,
-    {
-        <D as Scalar>::sqrt(get_scalar_from_float::<D>((self.p) as f64))
-    }
+    // /// Return a typical distance scale used in trust-region methods.
+    // pub fn typical_dist(&self) -> D
+    // where
+    //     D: Real,
+    // {
+    //     D::sqrt(get_scalar_from_float::<D>((self.p) as f64))
+    // }
 
-    /// Geodesic distance approximation via principal angles.
-    pub fn dist(&self, point_a: &Array2<D>, point_b: &Array2<D>) -> D
-    where
-        D: Real + Lapack<Real = D>,
-    {
-        let s = point_a.t().dot(point_b).svd(false, false).unwrap().1;
-        let principal_angles = s.mapv(|x| Scalar::acos(D::min(x, D::one())));
-        principal_angles.norm_l2()
-    }
+    // /// Geodesic distance approximation via principal angles.
+    // pub fn dist(&self, point_a: &Array2<D>, point_b: &Array2<D>) -> D
+    // where
+    //     D: Real + Lapack<Real = D>,
+    // {
+    //     let s = point_a.t().dot(point_b).svd(false, false).unwrap().1;
+    //     let principal_angles = s.mapv(|x| Scalar::acos(D::min(x, D::one())));
+    //     principal_angles.norm_l2()
+    // }
 
     // /// Sample a random unit-norm tangent vector at `point`.
     // pub fn random_tangent_vector(&self, point: &Array2<D>) -> Array2<D>
@@ -73,7 +73,7 @@ where
 
 impl<D> Manifold for Grassmann<D>
 where
-    D: Scalar + ScalarOperand + Real + Lapack<Real = D>,
+    D: ScalarOperand + Real + Lapack<Real = D>,
 {
     type Point = Array2<D>;
     type TangentVector = Array2<D>;
@@ -109,7 +109,7 @@ where
 
 impl<D> EGradToRGrad for Grassmann<D>
 where
-    D: Scalar + ScalarOperand + Real + Lapack<Real = D>,
+    D: ScalarOperand + Real + Lapack<Real = D>,
 {
     fn egrad_to_rgrad(
         &self,
@@ -122,7 +122,7 @@ where
 
 impl<D> EHessToRHess for Grassmann<D>
 where
-    D: Scalar + ScalarOperand + Real + Lapack<Real = D>,
+    D: ScalarOperand + Real + Lapack<Real = D>,
 {
     fn ehess_to_rhess(
         &self,
@@ -139,7 +139,7 @@ where
 
 impl<D> RandomPoint for Grassmann<D>
 where
-    D: Scalar + ScalarOperand + Real + Lapack<Real = D>,
+    D: ScalarOperand + Real + Lapack<Real = D>,
     StandardNormal: Distribution<D>,
 {
     /// Sample a random point and project it to `Gr(n, p)` via SVD.
@@ -180,7 +180,7 @@ where
 
 impl<D> Exp for Grassmann<D>
 where
-    D: Scalar + ScalarOperand + Real + Lapack<Real = D>,
+    D: ScalarOperand + Real + Lapack<Real = D>,
 {
     fn exp(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
         let (u, s, vt) = tangent_vector.svd(true, true).unwrap();

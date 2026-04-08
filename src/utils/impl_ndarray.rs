@@ -1,12 +1,11 @@
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::types::Scalar;
 use ndarray_linalg::{Lapack, Norm};
 
 use crate::utils::traits::{InnerProduct, Norm as VectorNorm, RCLike, Real, Vector};
 
 impl<D, IxN> Vector for Array<D, IxN>
 where
-    D: RCLike + Clone + ScalarOperand + Scalar,
+    D: RCLike + ScalarOperand,
     IxN: Dimension,
 {
     type Field = D;
