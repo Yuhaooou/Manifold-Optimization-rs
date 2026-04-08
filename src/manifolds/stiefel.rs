@@ -46,7 +46,6 @@ where
         }
     }
 
-    /// Set retraction type: `0` for QR, `1` for Polar.
     pub fn set_retraction_type(&mut self, t: RetractionType) -> &mut Self {
         self.retraction_type = t;
         self
@@ -89,7 +88,6 @@ where
         Array2::zeros((self.n, self.p))
     }
 
-    #[inline]
     fn inner(
         &self,
         _point: &Self::Point,

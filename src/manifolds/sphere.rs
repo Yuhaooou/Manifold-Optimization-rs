@@ -59,7 +59,6 @@ where
         Array1::zeros(self.n)
     }
 
-    #[inline]
     fn inner(
         &self,
         _point: &Self::Point,

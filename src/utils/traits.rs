@@ -173,6 +173,8 @@ pub trait RCLike: Field + Copy + 'static {
     /// Absolute value (modulus) of the Real (complex) number. Returns the same type of the input.
     fn abs(self) -> Self;
 
+    fn conj(self) -> Self;
+
     /// Principal square root.
     fn sqrt(self) -> Self;
 }
@@ -180,6 +182,10 @@ pub trait RCLike: Field + Copy + 'static {
 impl RCLike for c64 {
     fn abs(self) -> Self {
         c64::norm(self).as_c()
+    }
+
+    fn conj(self) -> Self {
+        c64::conj(&self)
     }
 
     fn sqrt(self) -> Self {
@@ -190,6 +196,10 @@ impl RCLike for c64 {
 impl RCLike for c32 {
     fn abs(self) -> Self {
         c32::norm(self).as_c()
+    }
+
+    fn conj(self) -> Self {
+        c32::conj(&self)
     }
 
     fn sqrt(self) -> Self {
@@ -203,6 +213,10 @@ where
 {
     fn abs(self) -> R {
         <R as NumFloat>::abs(self)
+    }
+
+    fn conj(self) -> Self {
+        self
     }
 
     fn sqrt(self) -> Self {

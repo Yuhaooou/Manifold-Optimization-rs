@@ -28,7 +28,6 @@ impl Error for Errors {}
 pub type AlgorithmResult<T> = Result<T, Errors>;
 
 /// Convert an f64 literal to a generic scalar type.
-#[inline]
 pub fn get_scalar_from_float<D>(f: f64) -> D
 where
     D: Scalar,
@@ -36,7 +35,6 @@ where
     D::from_real(D::real(f))
 }
 
-#[inline]
 /// Return the symmetric part of a square matrix: `(A + A^T) / 2`.
 ///
 /// # Panics
@@ -52,7 +50,6 @@ where
     (mat + &mat.t()) / get_scalar_from_float::<D>(2.0)
 }
 
-#[inline]
 /// Return the skew-symmetric part of a square matrix: `(A - A^T) / 2`.
 ///
 /// # Panics

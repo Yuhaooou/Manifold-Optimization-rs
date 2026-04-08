@@ -135,31 +135,31 @@ where
         &self.initial_point
     }
 
-    #[inline]
+    /// Set a new initial point, returning the old one.
+    pub fn set_new_initial_point(&mut self, new_init: M::Point) -> M::Point {
+        std::mem::replace(&mut self.initial_point, new_init)
+    }
+
     /// Evaluate objective value at point `x`.
     pub fn value(&self, x: &M::Point) -> F::Field {
         self.function.value(x)
     }
 
-    #[inline]
     /// Norm induced by manifold metric.
     pub fn norm(&self, x: &M::Point, v: &M::TangentVector) -> M::Field {
         self.manifold.norm(x, v)
     }
 
-    #[inline]
     /// Manifold inner product of tangent vectors.
     pub fn inner(&self, x: &M::Point, v1: &M::TangentVector, v2: &M::TangentVector) -> M::Field {
         self.manifold.inner(x, v1, v2)
     }
 
-    #[inline]
     /// Retract a tangent vector back to the manifold.
     pub fn retraction(&self, x: &M::Point, u: &M::TangentVector) -> M::Point {
         self.manifold.retraction(x, u)
     }
 
-    #[inline]
     /// Project an ambient vector to tangent space.
     pub fn projection(&self, x: &M::Point, u: &M::AmbientPoint) -> M::TangentVector {
         self.manifold.projection(x, u)
@@ -169,16 +169,13 @@ where
 impl<M, F> Problem<'_, M, F>
 where
     M: Manifold + EGradToRGrad,
-    F: Function<Point = M::Point, Field = M::Field>
-        + EGradient<Point = M::Point, Gradient = M::AmbientPoint>,
+    F: FuncWithEGrad<M::Field, M::Point, M::AmbientPoint>,
 {
-    #[inline]
     /// Euclidean gradient of the objective.
     pub fn euclidean_gradient(&self, x: &M::Point) -> M::AmbientPoint {
         self.function.euclidean_gradient(x)
     }
 
-    #[inline]
     /// Convert Euclidean gradient to Riemannian gradient.
     pub fn egrad_to_rgrad(&self, x: &M::Point, egrad: &M::AmbientPoint) -> M::TangentVector {
         self.manifold.egrad_to_rgrad(x, egrad)
@@ -194,17 +191,13 @@ where
 impl<M, F> Problem<'_, M, F>
 where
     M: Manifold + EGradToRGrad + EHessToRHess,
-    F: Function<Point = M::Point, Field = M::Field>
-        + EGradient<Point = M::Point, Gradient = M::AmbientPoint>
-        + EHessian<Point = M::Point, Direction = M::TangentVector, Hessian = M::AmbientPoint>,
+    F: FuncWithEGradEHess<M::Field, M::Point, M::AmbientPoint, M::TangentVector, M::AmbientPoint>,
 {
-    #[inline]
     /// Euclidean Hessian action of the objective.
     pub fn euclidean_hessian(&self, x: &M::Point, u: &M::TangentVector) -> M::AmbientPoint {
         self.function.euclidean_hessian(x, u)
     }
 
-    #[inline]
     /// Convert Euclidean Hessian action to Riemannian Hessian action.
     pub fn ehess_to_rhess(
         &self,

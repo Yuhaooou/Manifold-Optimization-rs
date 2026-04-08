@@ -168,8 +168,8 @@ where
     {
         loop {
             let point = Array2::random_using((self.n, self.p), &dist, rng);
-            match point.svd(true, true).unwrap() {
-                (Some(u), _, Some(vt)) => return u.dot(&vt),
+            match point.svd(true, true) {
+                Ok((Some(u), _, Some(vt))) => return u.dot(&vt),
                 _ => println!(
                     "Warning: get random point failed due to SVD decomposition failure. Retrying..."
                 ),

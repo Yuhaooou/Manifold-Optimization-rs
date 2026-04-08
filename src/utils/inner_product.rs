@@ -1,6 +1,6 @@
 use ndarray::prelude::*;
 
-use crate::utils::traits::{RCLike, Real};
+use crate::utils::traits::RCLike;
 
 /// Inner product extension trait for ndarray arrays.
 pub trait InnerProduct {
@@ -13,17 +13,18 @@ pub trait InnerProduct {
 
 impl<A, IxN> InnerProduct for Array<A, IxN>
 where
-    A: Real,
+    A: RCLike,
     IxN: Dimension,
 {
     type Elem = A;
     type IxN = IxN;
 
+    // Need optimization.
     fn inner(&self, rhs: &Array<A, IxN>) -> A {
         assert!(
             self.shape() == rhs.shape(),
             "Inner product requires the same shape"
         );
-        (self * rhs).sum()
+        (self * rhs.mapv(RCLike::conj)).sum()
     }
 }
