@@ -1,3 +1,5 @@
+use rand::{Rng, distr::Distribution};
+
 use crate::utils::traits::{RCLike, Vector};
 
 /// Generic manifold interface used by optimization algorithms.
@@ -77,13 +79,53 @@ pub trait Log: Manifold {
     fn log(&self, point: &Self::Point, other: &Self::Point) -> Self::TangentVector;
 }
 
+// TODO: Simplify this trait.
 /// Trait for manifolds that can sample random points.
 pub trait RandomPoint: Manifold {
     /// Generate a random point on the manifold.
     fn random_point(&self) -> Self::Point;
+
+    fn random_point_with_rng<R>(&self, rng: &mut R) -> Self::Point
+    where
+        R: Rng + ?Sized;
+
+    fn random_point_with_dist<Dist>(&self, dist: Dist) -> Self::Point
+    where
+        Dist: Distribution<Self::Field>;
+
+    fn random_point_with<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
+    where
+        Dist: Distribution<Self::Field>,
+        R: Rng + ?Sized;
 }
 
 pub trait RandomTangentVector: Manifold {
     /// Generate a random tangent vector at `point`.
     fn random_tangent_vector(&self, point: &Self::Point) -> Self::TangentVector;
+
+    fn random_tangent_vector_with_rng<R>(
+        &self,
+        point: &Self::Point,
+        rng: &mut R,
+    ) -> Self::TangentVector
+    where
+        R: Rng + ?Sized;
+
+    fn random_tangent_vector_with_dist<Dist>(
+        &self,
+        point: &Self::Point,
+        dist: Dist,
+    ) -> Self::TangentVector
+    where
+        Dist: Distribution<Self::Field>;
+
+    fn random_tangent_vector_with<Dist, R>(
+        &self,
+        point: &Self::Point,
+        dist: Dist,
+        rng: &mut R,
+    ) -> Self::TangentVector
+    where
+        Dist: Distribution<Self::Field>,
+        R: Rng + ?Sized;
 }

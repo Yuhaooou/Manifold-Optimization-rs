@@ -1,14 +1,14 @@
 use ndarray::{ScalarOperand, prelude::*};
 use ndarray_linalg::{Lapack, SVD, Scalar};
-use ndarray_rand::{RandomExt, rand_distr::Uniform};
-use rand::distr::uniform::SampleUniform;
+use ndarray_rand::RandomExt;
+use rand::Rng;
+use rand_distr::{Distribution, StandardNormal};
 
-use crate::manifolds::Manifold;
-use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, RandomPoint};
-use crate::utils::traits::{RCLike, Real};
+use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint};
 use crate::utils::{
     inner_product::InnerProduct,
-    tools::{get_scalar_from_float, mat_sym, qr},
+    tools::{mat_sym, qr},
+    traits::{RCLike, Real},
 };
 
 #[derive(Debug, Clone)]
@@ -99,7 +99,7 @@ where
     fn projection(&self, point: &Array2<D>, ambient_point: &Self::TangentVector) -> Self::Point {
         let tmp1 = (Array::eye(self.n) - point.dot(&point.t())).dot(ambient_point);
         let tmp2 = point.t().dot(ambient_point) - ambient_point.t().dot(point);
-        tmp1 + point.dot(&tmp2) / get_scalar_from_float::<D>(2.)
+        tmp1 + point.dot(&tmp2) / D::fromi8(2)
     }
 
     fn retraction(&self, point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
@@ -136,19 +136,45 @@ where
     }
 }
 
+// Q: Is standard normal randomly enough after QR?
 impl<D> RandomPoint for Stiefel<D>
 where
-    D: Real + Scalar + ScalarOperand + SampleUniform + Lapack,
+    D: Real + Scalar + ScalarOperand + Lapack,
+    StandardNormal: Distribution<D>,
 {
     /// Sample a random matrix and retract to the manifold.
     fn random_point(&self) -> Array2<D> {
-        let distribution = Uniform::new(
-            get_scalar_from_float::<D>(0.),
-            get_scalar_from_float::<D>(1.),
-        )
-        .unwrap();
-        let point = Array2::random((self.n, self.p), distribution);
-        self.retraction(&self.base_point(), &point)
+        self.random_point_with(StandardNormal, &mut rand::rng())
+    }
+
+    fn random_point_with_rng<R>(&self, rng: &mut R) -> Self::Point
+    where
+        R: Rng + ?Sized,
+    {
+        self.random_point_with(StandardNormal, rng)
+    }
+
+    fn random_point_with_dist<Dist>(&self, dist: Dist) -> Self::Point
+    where
+        Dist: Distribution<D>,
+    {
+        self.random_point_with(dist, &mut rand::rng())
+    }
+
+    fn random_point_with<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
+    where
+        Dist: Distribution<Self::Field>,
+        R: Rng + ?Sized,
+    {
+        loop {
+            let point = Array2::random_using((self.n, self.p), &dist, rng);
+            match qr(&point) {
+                Ok(q) => return q,
+                Err(_) => println!(
+                    "Warning: get random point failed due to QR decomposition failure. Retrying..."
+                ),
+            }
+        }
     }
 }
 
@@ -156,6 +182,7 @@ where
 mod tests {
     use super::*;
     use ndarray_linalg::Norm;
+    use rand::distr::Uniform;
 
     #[test]
     fn test_stiefel() {

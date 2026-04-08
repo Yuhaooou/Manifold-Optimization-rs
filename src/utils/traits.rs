@@ -45,6 +45,10 @@ pub trait Real:
         Self::from_f64(0.5)
     }
 
+    fn fromi8(i: i8) -> Self {
+        Self::from_f32(i as f32)
+    }
+
     fn addi(self, rhs: i32) -> Self;
     fn subi(self, rhs: i32) -> Self;
     fn muli(self, rhs: i32) -> Self;

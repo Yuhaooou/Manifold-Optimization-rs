@@ -10,7 +10,7 @@ authors = [
 ]
 
 [dependencies]
-rand = "0.9"
+rand = "0.9.2"
 ndarray = { version = "0.17.2" }
 ndarray-linalg = { version = "0.18.1", features = ["openblas-system"] }
 ndarray-rand = "0.16.0"
@@ -19,6 +19,7 @@ num-traits = "0.2"
 num-complex = "0.4.6"
 bon = "3.9.1"
 derive-new = "0.7.0"
+rand_distr = "0.5.1"
 
 [target.'cfg(windows)'.build-dependencies]
 vcpkg = "0.2.15"

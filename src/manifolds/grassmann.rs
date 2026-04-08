@@ -1,7 +1,8 @@
 use ndarray::{ScalarOperand, prelude::*};
 use ndarray_linalg::{Lapack, Norm, SVD, Scalar};
-use ndarray_rand::{RandomExt, rand_distr::Uniform};
-use rand::distr::uniform::SampleUniform;
+use ndarray_rand::RandomExt;
+use rand::Rng;
+use rand_distr::{Distribution, StandardNormal};
 
 use crate::manifolds::Manifold;
 use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, Exp, RandomPoint};
@@ -53,21 +54,21 @@ where
         principal_angles.norm_l2()
     }
 
-    /// Sample a random unit-norm tangent vector at `point`.
-    pub fn random_tangent_vector(&self, point: &Array2<D>) -> Array2<D>
-    where
-        D: Real + Lapack<Real = D> + SampleUniform,
-    {
-        let distribution = Uniform::new(
-            get_scalar_from_float::<D>(0.),
-            get_scalar_from_float::<D>(1.),
-        )
-        .unwrap();
-        let tangent_vector =
-            self.projection(point, &Array2::random((self.n, self.p), distribution));
-        let tangent_norm = tangent_vector.norm_l2();
-        tangent_vector / tangent_norm
-    }
+    // /// Sample a random unit-norm tangent vector at `point`.
+    // pub fn random_tangent_vector(&self, point: &Array2<D>) -> Array2<D>
+    // where
+    //     D: Real + Lapack<Real = D> + SampleUniform,
+    // {
+    //     let distribution = Uniform::new(
+    //         get_scalar_from_float::<D>(0.),
+    //         get_scalar_from_float::<D>(1.),
+    //     )
+    //     .unwrap();
+    //     let tangent_vector =
+    //         self.projection(point, &Array2::random((self.n, self.p), distribution));
+    //     let tangent_norm = tangent_vector.norm_l2();
+    //     tangent_vector / tangent_norm
+    // }
 }
 
 impl<D> Manifold for Grassmann<D>
@@ -101,7 +102,6 @@ where
     }
 
     fn retraction(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
-        // Polar retraction, matching pymanopt Grassmann retraction.
         let (u, _, vt) = (point + tangent_vector).svd(true, true).unwrap();
         u.unwrap().dot(&vt.unwrap())
     }
@@ -139,18 +139,42 @@ where
 
 impl<D> RandomPoint for Grassmann<D>
 where
-    D: Scalar + ScalarOperand + Real + Lapack<Real = D> + SampleUniform,
+    D: Scalar + ScalarOperand + Real + Lapack<Real = D>,
+    StandardNormal: Distribution<D>,
 {
     /// Sample a random point and project it to `Gr(n, p)` via SVD.
-    fn random_point(&self) -> Self::Point {
-        let distribution = Uniform::new(
-            get_scalar_from_float::<D>(0.),
-            get_scalar_from_float::<D>(1.),
-        )
-        .unwrap();
-        let point = Array2::random((self.n, self.p), distribution);
-        let (u, _, vt) = point.svd(true, true).unwrap();
-        u.unwrap().dot(&vt.unwrap())
+    fn random_point(&self) -> Array2<D> {
+        self.random_point_with(StandardNormal, &mut rand::rng())
+    }
+
+    fn random_point_with_rng<R>(&self, rng: &mut R) -> Self::Point
+    where
+        R: Rng + ?Sized,
+    {
+        self.random_point_with(StandardNormal, rng)
+    }
+
+    fn random_point_with_dist<Dist>(&self, dist: Dist) -> Self::Point
+    where
+        Dist: Distribution<D>,
+    {
+        self.random_point_with(dist, &mut rand::rng())
+    }
+
+    fn random_point_with<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
+    where
+        Dist: Distribution<Self::Field>,
+        R: Rng + ?Sized,
+    {
+        loop {
+            let point = Array2::random_using((self.n, self.p), &dist, rng);
+            match point.svd(true, true).unwrap() {
+                (Some(u), _, Some(vt)) => return u.dot(&vt),
+                _ => println!(
+                    "Warning: get random point failed due to SVD decomposition failure. Retrying..."
+                ),
+            }
+        }
     }
 }
 
@@ -158,11 +182,7 @@ impl<D> Exp for Grassmann<D>
 where
     D: Scalar + ScalarOperand + Real + Lapack<Real = D>,
 {
-    fn exp(
-        &self,
-        point: &Self::Point,
-        tangent_vector: &Self::TangentVector,
-    ) -> Self::Point {
+    fn exp(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
         let (u, s, vt) = tangent_vector.svd(true, true).unwrap();
         let u = u.unwrap();
         let vt = vt.unwrap();

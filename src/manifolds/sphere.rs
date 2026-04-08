@@ -1,12 +1,19 @@
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::{InnerProduct, Lapack, Norm, Scalar};
-use ndarray_rand::{RandomExt, rand_distr::Uniform};
-use rand::distr::uniform::SampleUniform;
+use ndarray_linalg::{Lapack, Norm, Scalar};
+use ndarray_rand::RandomExt;
+use rand::{
+    Rng,
+    distr::{
+        Distribution,
+        uniform::{SampleUniform, Uniform},
+    },
+};
 
-use crate::manifolds::Manifold;
-use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, RandomPoint};
-use crate::utils::tools::get_scalar_from_float;
-use crate::utils::traits::{RCLike, Real};
+use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint};
+use crate::utils::{
+    inner_product::InnerProduct,
+    traits::{RCLike, Real},
+};
 
 #[derive(Debug, Clone)]
 /// Sphere manifold $S^{n-1}$ embedded in Euclidean space.
@@ -102,12 +109,29 @@ where
 {
     /// Sample a random point and normalize it onto the sphere.
     fn random_point(&self) -> Array1<D> {
-        let distribution = Uniform::new(
-            get_scalar_from_float::<D>(0.),
-            get_scalar_from_float::<D>(1.),
-        )
-        .unwrap();
-        let point = Array1::random(self.n, distribution);
+        self.random_point_with(Uniform::new(-D::one(), D::one()).unwrap(), &mut rand::rng())
+    }
+
+    fn random_point_with_rng<R>(&self, rng: &mut R) -> Self::Point
+    where
+        R: Rng + ?Sized,
+    {
+        self.random_point_with(Uniform::new(-D::one(), D::one()).unwrap(), rng)
+    }
+
+    fn random_point_with_dist<Dist>(&self, dist: Dist) -> Self::Point
+    where
+        Dist: Distribution<Self::Field>,
+    {
+        self.random_point_with(dist, &mut rand::rng())
+    }
+
+    fn random_point_with<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
+    where
+        Dist: Distribution<Self::Field>,
+        R: Rng + ?Sized,
+    {
+        let point = Array1::random_using(self.n, dist, rng);
         &point / D::from_real(point.norm_l2())
     }
 }
