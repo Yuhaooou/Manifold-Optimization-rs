@@ -49,12 +49,6 @@ where
         self
     }
 
-    // pub fn is_point_on_manifold(&self, point: &Array2<D>) -> bool {
-    //     let identity = Array::eye(self.p);
-    //     let product = point.t().dot(point);
-    //     product == identity
-    // }
-
     fn retraction_qr(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D>
     where
         D: Scalar + ScalarOperand + Lapack + Real,

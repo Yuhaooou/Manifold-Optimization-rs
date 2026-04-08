@@ -16,20 +16,6 @@ pub trait Manifold: Clone {
     /// Ambient-space representation type used for projections and Euclidean derivatives.
     type AmbientPoint: Clone;
 
-    // fn ispoint_on_manifold(&self, point: &Self::Point) -> bool {
-    //     println!("ispoint_on_manifold not implemented for this manifold");
-    //     false
-    // }
-
-    // fn istangent_vector(
-    //     &self,
-    //     point: &Self::Point,
-    //     tangent_vector: &Self::TangentVector,
-    // ) -> bool {
-    //     println!("istangent_vector not implemented for this manifold");
-    //     false
-    // }
-
     /// Return a canonical base point on the manifold.
     fn base_point(&self) -> Self::Point {
         unimplemented!("Base point not implemented for this manifold");
@@ -59,27 +45,6 @@ pub trait Manifold: Clone {
 
     /// Retraction map from tangent space back to manifold.
     fn retraction(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point;
-
-    // fn egrad_to_rgrad(
-    //     &self,
-    //     point: &Self::Point,
-    //     egrad: &Self::AmbientPoint,
-    // ) -> Self::TangentVector {
-    //     let _ = (point, egrad);
-    //     unimplemented!("Egrad to Rgrad conversion not implemented for this manifold");
-    // }
-
-    //// Convert Euclidean Hessian-vector product to Riemannian Hessian-vector product.
-    // fn ehess_to_rhess(
-    //     &self,
-    //     point: &Self::Point,
-    //     tangent_vector: &Self::TangentVector,
-    //     egrad: &Self::AmbientPoint,
-    //     ehess: &Self::AmbientPoint,
-    // ) -> Self::TangentVector {
-    //     let _ = (point, tangent_vector, egrad, ehess);
-    //     unimplemented!("Ehess to Rhess conversion not implemented for this manifold");
-    // }
 }
 
 pub trait EGradToRGrad: Manifold {

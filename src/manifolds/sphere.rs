@@ -42,14 +42,6 @@ where
     type TangentVector = Array1<D>;
     type AmbientPoint = Array1<D>;
 
-    // fn is_point_on_manifold(&self, point: &Self::Point) -> bool {
-    //     point.norm_l2() == D::one().re()
-    // }
-
-    // fn is_tangent_vector(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> bool {
-    //     self.is_point_on_manifold(point) && point.dot(tangent_vector) == D::zero()
-    // }
-
     fn base_point(&self) -> Self::Point {
         let mut res = Array1::zeros(self.n);
         res[0] = D::one();
