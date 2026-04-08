@@ -21,7 +21,7 @@ pub struct Sphere<D>
 where
     D: RCLike,
 {
-    name: String,
+    pub name: String,
     n: usize,
     _marker: std::marker::PhantomData<D>,
 }
@@ -37,6 +37,11 @@ where
             n,
             _marker: std::marker::PhantomData,
         }
+    }
+
+    pub fn set_name(mut self, name: String) -> Self {
+        self.name = name;
+        self
     }
 }
 

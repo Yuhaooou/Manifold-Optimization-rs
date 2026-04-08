@@ -23,7 +23,7 @@ pub struct Stiefel<D>
 where
     D: RCLike,
 {
-    name: String,
+    pub name: String,
     n: usize,
     p: usize,
     retraction_type: RetractionType,
@@ -64,6 +64,11 @@ where
     {
         let (u, _, vt) = (point + tangent_vector).svd(true, true).unwrap();
         u.unwrap().dot(&vt.unwrap())
+    }
+
+    pub fn set_name(mut self, name: String) -> Self {
+        self.name = name;
+        self
     }
 }
 

@@ -15,7 +15,7 @@ pub struct Grassmann<D>
 where
     D: Real + ScalarOperand,
 {
-    name: String,
+    pub name: String,
     n: usize,
     p: usize,
     _marker: std::marker::PhantomData<D>,
@@ -36,39 +36,10 @@ where
         }
     }
 
-    // /// Return a typical distance scale used in trust-region methods.
-    // pub fn typical_dist(&self) -> D
-    // where
-    //     D: Real,
-    // {
-    //     D::sqrt(get_scalar_from_float::<D>((self.p) as f64))
-    // }
-
-    // /// Geodesic distance approximation via principal angles.
-    // pub fn dist(&self, point_a: &Array2<D>, point_b: &Array2<D>) -> D
-    // where
-    //     D: Real + Lapack<Real = D>,
-    // {
-    //     let s = point_a.t().dot(point_b).svd(false, false).unwrap().1;
-    //     let principal_angles = s.mapv(|x| Scalar::acos(D::min(x, D::one())));
-    //     principal_angles.norm_l2()
-    // }
-
-    // /// Sample a random unit-norm tangent vector at `point`.
-    // pub fn random_tangent_vector(&self, point: &Array2<D>) -> Array2<D>
-    // where
-    //     D: Real + Lapack<Real = D> + SampleUniform,
-    // {
-    //     let distribution = Uniform::new(
-    //         get_scalar_from_float::<D>(0.),
-    //         get_scalar_from_float::<D>(1.),
-    //     )
-    //     .unwrap();
-    //     let tangent_vector =
-    //         self.projection(point, &Array2::random((self.n, self.p), distribution));
-    //     let tangent_norm = tangent_vector.norm_l2();
-    //     tangent_vector / tangent_norm
-    // }
+    pub fn set_name(mut self, name: String) -> Self {
+        self.name = name;
+        self
+    }
 }
 
 impl<D> Manifold for Grassmann<D>

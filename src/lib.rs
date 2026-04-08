@@ -6,7 +6,6 @@
 //! - Solvers such as RGD/RTR in the `algorithm` module.
 //! - Shared numeric/vector utilities in the `utils` module.
 
-#![allow(dead_code)]
 pub mod algorithm;
 pub mod manifolds;
 pub mod problem;
