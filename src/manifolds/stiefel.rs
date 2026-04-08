@@ -4,6 +4,7 @@ use ndarray_rand::{RandomExt, rand_distr::Uniform};
 use rand::distr::uniform::SampleUniform;
 
 use crate::manifolds::Manifold;
+use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess};
 use crate::utils::traits::{RCLike, Real};
 use crate::utils::{
     inner_product::InnerProduct,
@@ -116,11 +117,21 @@ where
             panic!("Invalid retraction type")
         }
     }
+}
 
+impl<D> EGradToRGrad for Stiefel<D>
+where
+    D: Real + ScalarOperand + Scalar + Lapack,
+{
     fn egrad_to_rgrad(&self, point: &Array2<D>, egrad: &Array2<D>) -> Array2<D> {
         egrad - point.dot(&mat_sym(&point.t().dot(egrad)))
     }
+}
 
+impl<D> EHessToRHess for Stiefel<D>
+where
+    D: Real + ScalarOperand + Scalar + Lapack,
+{
     fn ehess_to_rhess(
         &self,
         point: &Array2<D>,

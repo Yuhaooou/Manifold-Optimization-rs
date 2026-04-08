@@ -1,4 +1,5 @@
 use crate::manifolds::Manifold;
+use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess};
 use crate::utils::random_point::RandomOn;
 use crate::utils::traits::RCLike;
 
@@ -49,10 +50,7 @@ pub trait EHessian {
     type Hessian;
 
     /// Compute Euclidean Hessian action at `x` along direction `u`.
-    fn euclidean_hessian(&self, x: &Self::Point, u: &Self::Direction) -> Self::Hessian {
-        let _ = (x, u);
-        unimplemented!("Euclidean Hessian is not implemented for this function.")
-    }
+    fn euclidean_hessian(&self, x: &Self::Point, u: &Self::Direction) -> Self::Hessian;
 }
 
 /// Marker trait for functions with Euclidean Hessian.
@@ -95,8 +93,6 @@ where
     pub(crate) manifold: &'a M,
     pub(crate) function: &'a F,
     pub(crate) initial_point: Option<M::Point>,
-    // pub(crate) has_rgrad: bool,
-    // pub(crate) has_rhess: bool,
 }
 
 impl<'a, M, F> Problem<'a, M, F>
@@ -110,8 +106,6 @@ where
             manifold,
             function,
             initial_point: None,
-            // has_rgrad: false,
-            // has_rhess: false,
         }
     }
 }
@@ -173,7 +167,7 @@ where
 
 impl<M, F> Problem<'_, M, F>
 where
-    M: Manifold,
+    M: Manifold + EGradToRGrad,
     F: Function<Point = M::Point, Field = M::Field>
         + EGradient<Point = M::Point, Gradient = M::AmbientPoint>,
 {
@@ -198,7 +192,7 @@ where
 
 impl<M, F> Problem<'_, M, F>
 where
-    M: Manifold,
+    M: Manifold + EGradToRGrad + EHessToRHess,
     F: Function<Point = M::Point, Field = M::Field>
         + EGradient<Point = M::Point, Gradient = M::AmbientPoint>
         + EHessian<Point = M::Point, Direction = M::TangentVector, Hessian = M::AmbientPoint>,

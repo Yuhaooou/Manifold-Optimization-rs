@@ -4,6 +4,7 @@ use ndarray_rand::{RandomExt, rand_distr::Uniform};
 use rand::distr::uniform::SampleUniform;
 
 use crate::manifolds::Manifold;
+use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, Exponential};
 use crate::utils::traits::Real;
 use crate::utils::{
     inner_product::InnerProduct, random_point::RandomOn, tools::get_scalar_from_float,
@@ -80,23 +81,6 @@ where
     type AmbientPoint = Array2<D>;
     type Field = D;
 
-    // fn is_point_on_manifold(&self, point: &Self::Point) -> bool {
-    //     if point.nrows() != self.n || point.ncols() != self.p {
-    //         return false;
-    //     }
-    //     let gram = point.t().dot(point);
-    //     let residual = &gram - &Array2::<D>::eye(self.p);
-    //     residual.norm_l2() <= get_scalar_from_float::<D>(1e-8)
-    // }
-
-    // fn is_tangent_vector(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> bool {
-    //     if point.raw_dim() != tangent_vector.raw_dim() {
-    //         return false;
-    //     }
-    //     let orthogonality = point.t().dot(tangent_vector);
-    //     orthogonality.norm_l2() <= get_scalar_from_float::<D>(1e-8)
-    // }
-
     fn base_point(&self) -> Self::Point {
         todo!()
     }
@@ -123,20 +107,12 @@ where
         let (u, _, vt) = (point + tangent_vector).svd(true, true).unwrap();
         u.unwrap().dot(&vt.unwrap())
     }
+}
 
-    fn exponential_map(
-        &self,
-        point: &Self::Point,
-        tangent_vector: &Self::TangentVector,
-    ) -> Self::Point {
-        let (u, s, vt) = tangent_vector.svd(true, true).unwrap();
-        let u = u.unwrap();
-        let vt = vt.unwrap();
-        let cos_s = Array::from_diag(&s.mapv(Scalar::cos));
-        let sin_s = Array::from_diag(&s.mapv(Scalar::sin));
-        point.dot(&vt.t().dot(&cos_s).dot(&vt)) + u.dot(&sin_s).dot(&vt)
-    }
-
+impl<D> EGradToRGrad for Grassmann<D>
+where
+    D: Scalar + ScalarOperand + Real + Lapack<Real = D>,
+{
     fn egrad_to_rgrad(
         &self,
         point: &Self::Point,
@@ -144,7 +120,12 @@ where
     ) -> Self::TangentVector {
         self.projection(point, egrad)
     }
+}
 
+impl<D> EHessToRHess for Grassmann<D>
+where
+    D: Scalar + ScalarOperand + Real + Lapack<Real = D>,
+{
     fn ehess_to_rhess(
         &self,
         point: &Self::Point,
@@ -172,5 +153,23 @@ where
         let point = Array2::random((self.n, self.p), distribution);
         let (u, _, vt) = point.svd(true, true).unwrap();
         u.unwrap().dot(&vt.unwrap())
+    }
+}
+
+impl<D> Exponential for Grassmann<D>
+where
+    D: Scalar + ScalarOperand + Real + Lapack<Real = D>,
+{
+    fn exponential_map(
+        &self,
+        point: &Self::Point,
+        tangent_vector: &Self::TangentVector,
+    ) -> Self::Point {
+        let (u, s, vt) = tangent_vector.svd(true, true).unwrap();
+        let u = u.unwrap();
+        let vt = vt.unwrap();
+        let cos_s = Array::from_diag(&s.mapv(Scalar::cos));
+        let sin_s = Array::from_diag(&s.mapv(Scalar::sin));
+        point.dot(&vt.t().dot(&cos_s).dot(&vt)) + u.dot(&sin_s).dot(&vt)
     }
 }

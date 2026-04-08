@@ -1,7 +1,7 @@
 use crate::utils::traits::{RCLike, Vector};
 
 /// Generic manifold interface used by optimization algorithms.
-/// The reason for methods like [`Self::inner`] needs to be method instead of associated functions 
+/// The reason for methods like [`Self::inner`] needs to be method instead of associated functions
 /// is that it may choose which inner product to use by the field in the manifold struct.
 pub trait Manifold: Clone {
     /// Scalar type used for geometry computations on this manifold.
@@ -47,52 +47,51 @@ pub trait Manifold: Clone {
         point: &Self::Point,
         tangent_vector1: &Self::TangentVector,
         tangent_vector2: &Self::TangentVector,
-    ) -> Self::Field {
-        let _ = (point, tangent_vector1, tangent_vector2);
-        unimplemented!("Metric not implemented for this manifold");
-    }
+    ) -> Self::Field;
 
     /// Norm induced by [`Self::inner`].
-    fn norm(
-        &self,
-        point: &Self::Point,
-        tangent_vector: &Self::TangentVector,
-    ) -> Self::Field {
+    fn norm(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Field {
         (self.inner(point, tangent_vector, tangent_vector)).sqrt()
     }
 
     /// Project ambient vector `ambient` to the tangent space at `point`.
-    fn projection(&self, point: &Self::Point, ambient: &Self::AmbientPoint) -> Self::TangentVector {
-        let _ = (point, ambient);
-        unimplemented!("Projection not implemented for this manifold");
-    }
+    fn projection(&self, point: &Self::Point, ambient: &Self::AmbientPoint) -> Self::TangentVector;
 
     /// Retraction map from tangent space back to manifold.
-    fn retraction(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
-        let _ = (point, tangent_vector);
-        unimplemented!("Retraction not implemented for this manifold");
-    }
+    fn retraction(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point;
 
-    /// Exponential map (exact geodesic step), when available.
-    fn exponential_map(
-        &self,
-        point: &Self::Point,
-        tangent_vector: &Self::TangentVector,
-    ) -> Self::Point {
-        let _ = (point, tangent_vector);
-        unimplemented!("Exponential map not implemented for this manifold");
-    }
+    // fn egrad_to_rgrad(
+    //     &self,
+    //     point: &Self::Point,
+    //     egrad: &Self::AmbientPoint,
+    // ) -> Self::TangentVector {
+    //     let _ = (point, egrad);
+    //     unimplemented!("Egrad to Rgrad conversion not implemented for this manifold");
+    // }
 
+    //// Convert Euclidean Hessian-vector product to Riemannian Hessian-vector product.
+    // fn ehess_to_rhess(
+    //     &self,
+    //     point: &Self::Point,
+    //     tangent_vector: &Self::TangentVector,
+    //     egrad: &Self::AmbientPoint,
+    //     ehess: &Self::AmbientPoint,
+    // ) -> Self::TangentVector {
+    //     let _ = (point, tangent_vector, egrad, ehess);
+    //     unimplemented!("Ehess to Rhess conversion not implemented for this manifold");
+    // }
+}
+
+pub trait EGradToRGrad: Manifold {
     /// Convert Euclidean gradient to Riemannian gradient.
     fn egrad_to_rgrad(
         &self,
         point: &Self::Point,
         egrad: &Self::AmbientPoint,
-    ) -> Self::TangentVector {
-        let _ = (point, egrad);
-        unimplemented!("Egrad to Rgrad conversion not implemented for this manifold");
-    }
+    ) -> Self::TangentVector;
+}
 
+pub trait EHessToRHess: Manifold {
     /// Convert Euclidean Hessian-vector product to Riemannian Hessian-vector product.
     fn ehess_to_rhess(
         &self,
@@ -100,8 +99,14 @@ pub trait Manifold: Clone {
         tangent_vector: &Self::TangentVector,
         egrad: &Self::AmbientPoint,
         ehess: &Self::AmbientPoint,
-    ) -> Self::TangentVector {
-        let _ = (point, tangent_vector, egrad, ehess);
-        unimplemented!("Ehess to Rhess conversion not implemented for this manifold");
-    }
+    ) -> Self::TangentVector;
+}
+
+pub trait Exponential: Manifold {
+    /// Exponential map (exact geodesic step), when available.
+    fn exponential_map(
+        &self,
+        point: &Self::Point,
+        tangent_vector: &Self::TangentVector,
+    ) -> Self::Point;
 }

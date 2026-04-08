@@ -4,6 +4,7 @@ use ndarray_rand::{RandomExt, rand_distr::Uniform};
 use rand::distr::uniform::SampleUniform;
 
 use crate::manifolds::Manifold;
+use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess};
 use crate::utils::traits::{RCLike, Real};
 use crate::utils::{random_point::RandomOn, tools::get_scalar_from_float};
 
@@ -77,11 +78,21 @@ where
         let res = point + tangent_vector;
         &res / <D as Scalar>::sqrt(res.dot(&res))
     }
+}
 
+impl<D> EGradToRGrad for Sphere<D>
+where
+    D: Real + ScalarOperand + Scalar,
+{
     fn egrad_to_rgrad(&self, point: &Array1<D>, egrad: &Array1<D>) -> Array1<D> {
         self.projection(point, egrad)
     }
+}
 
+impl<D> EHessToRHess for Sphere<D>
+where
+    D: Real + ScalarOperand + Scalar,
+{
     fn ehess_to_rhess(
         &self,
         point: &Self::Point,

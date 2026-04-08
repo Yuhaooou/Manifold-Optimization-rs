@@ -2,6 +2,7 @@ use derive_new::new;
 
 use crate::algorithm::Status;
 use crate::manifolds::Manifold;
+use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess};
 use crate::problem::{FuncWithEGrad, Problem};
 use crate::utils::random_point::RandomOn;
 use crate::utils::traits::{Real, Vector};
@@ -111,7 +112,7 @@ where
 impl<'a, 'b, R, M, F> RTR<'a, 'b, R, M, F>
 where
     R: Real,
-    M: Manifold<Field = R> + RandomOn,
+    M: Manifold<Field = R> + RandomOn + EGradToRGrad + EHessToRHess,
     F: FuncWithEGrad<R, M::Point, M::AmbientPoint> + RTRHessian<M>,
 {
     /// Set minimum gradient norm stopping threshold.
@@ -211,7 +212,7 @@ where
             }
             v = v_next;
             let r_next = r.ref_sub(hp.ref_mul_num(alpha));
-            if self.problem.norm(point, &r) < r_bound {
+            if self.problem.norm(point, &r_next) < r_bound {
                 let subproblem_value = subproblem_func(&v);
                 return (v, subproblem_value, Some(iter));
             }
