@@ -12,6 +12,12 @@ use crate::utils::{
 };
 
 #[derive(Debug, Clone)]
+pub enum RetractionType {
+    QR,
+    Polar,
+}
+
+#[derive(Debug, Clone)]
 /// Stiefel manifold `St(n, p)` of orthonormal `n x p` matrices.
 pub struct Stiefel<D>
 where
@@ -20,7 +26,7 @@ where
     name: String,
     n: usize,
     p: usize,
-    retraction_type: u8,
+    retraction_type: RetractionType,
     _marker: std::marker::PhantomData<D>,
 }
 
@@ -35,17 +41,14 @@ where
             name: format!("Stiefel manifold St({},{})", n, p),
             n,
             p,
-            retraction_type: 0,
+            retraction_type: RetractionType::QR,
             _marker: std::marker::PhantomData,
         }
     }
 
     /// Set retraction type: `0` for QR, `1` for Polar.
-    pub fn set_retraction_type(&mut self, retraction_type: u8) -> &mut Self {
-        if retraction_type > 1 {
-            panic!("Invalid retraction type. Must be 0 (QR) or 1 (Polar).");
-        }
-        self.retraction_type = retraction_type;
+    pub fn set_retraction_type(&mut self, t: RetractionType) -> &mut Self {
+        self.retraction_type = t;
         self
     }
 
@@ -104,9 +107,8 @@ where
 
     fn retraction(&self, point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
         match self.retraction_type {
-            0 => Self::retraction_qr(point, tangent_vector),
-            1 => Self::retraction_polar(point, tangent_vector),
-            _ => unimplemented!("Invalid retraction type"),
+            RetractionType::QR => Self::retraction_qr(point, tangent_vector),
+            RetractionType::Polar => Self::retraction_polar(point, tangent_vector),
         }
     }
 }
