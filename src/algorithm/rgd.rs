@@ -43,8 +43,8 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "RGDResult:\n")?;
-        write!(f, "    final_value: {},\n", self.final_value)?;
-        write!(f, "    grad_norm: {},\n", self.final_grad_norm)?;
+        write!(f, "    final_value: {:.8e},\n", self.final_value)?;
+        write!(f, "    grad_norm: {:.8e},\n", self.final_grad_norm)?;
         write!(f, "    iterations: {}.", self.iters)?;
         write!(f, "    status: {}.", self.status)
     }

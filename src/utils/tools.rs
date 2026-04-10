@@ -88,6 +88,7 @@ pub fn tsvd<D>(mat: &Array2<D>, r: usize) -> Result<(Array2<D>, Array1<D>, Array
 where
     D: Lapack<Real = D>,
 {
+    // TODO: directly use *gesvd to get truncated SVD.
     if let Ok((Some(u), s, Some(vt))) = mat.svd(true, true) {
         let u_truncated = u.slice(s![.., ..r]).to_owned();
         let s_truncated = s.slice(s![..r]).to_owned();

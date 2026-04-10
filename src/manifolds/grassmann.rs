@@ -1,5 +1,5 @@
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::{Lapack, SVD, Scalar};
+use ndarray_linalg::{Lapack, Scalar};
 use ndarray_rand::RandomExt;
 use rand::Rng;
 use rand_distr::{Distribution, StandardNormal};
@@ -7,6 +7,7 @@ use rand_distr::{Distribution, StandardNormal};
 use crate::manifolds::Manifold;
 use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, Exp, RandomPoint};
 use crate::utils::inner_product::InnerProduct;
+use crate::utils::tools::tsvd;
 use crate::utils::traits::Real;
 
 #[derive(Debug, Clone)]
@@ -73,8 +74,8 @@ where
     }
 
     fn retraction(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
-        let (u, _, vt) = (point + tangent_vector).svd(true, true).unwrap();
-        u.unwrap().dot(&vt.unwrap())
+        let (u, _, vt) = tsvd(&(point + tangent_vector), self.p).unwrap();
+        u.dot(&vt)
     }
 }
 
@@ -139,8 +140,8 @@ where
     {
         loop {
             let point = Array2::random_using((self.n, self.p), &dist, rng);
-            match point.svd(true, true) {
-                Ok((Some(u), _, Some(vt))) => return u.dot(&vt),
+            match tsvd(&point, self.p) {
+                Ok((u, _, vt)) => return u.dot(&vt),
                 _ => println!(
                     "Warning: get random point failed due to SVD decomposition failure. Retrying..."
                 ),
@@ -154,9 +155,7 @@ where
     D: ScalarOperand + Real + Lapack<Real = D>,
 {
     fn exp(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
-        let (u, s, vt) = tangent_vector.svd(true, true).unwrap();
-        let u = u.unwrap();
-        let vt = vt.unwrap();
+        let (u, s, vt) = tsvd(&tangent_vector, self.p).unwrap();
         let cos_s = Array::from_diag(&s.mapv(Scalar::cos));
         let sin_s = Array::from_diag(&s.mapv(Scalar::sin));
         point.dot(&vt.t().dot(&cos_s).dot(&vt)) + u.dot(&sin_s).dot(&vt)
