@@ -1,5 +1,5 @@
 use crate::manifolds::Manifold;
-use crate::problem::{Function, Problem};
+use crate::problem::Problem;
 use crate::utils::traits::{Real, Vector};
 
 /// Parameters for Armijo backtracking line search.
@@ -86,8 +86,8 @@ pub enum LineSearchStatus {
 /// - `status` reports why the search stopped.
 ///
 /// `covalue` is the directional derivative at `point` along `direction`.
-pub fn back_tracking<R, M, F>(
-    problem: &Problem<M, F>,
+pub fn back_tracking<R, M, F, G, H>(
+    problem: &Problem<M, F, G, H>,
     point: &M::Point,
     value: R,
     direction: &M::TangentVector,
@@ -97,7 +97,7 @@ pub fn back_tracking<R, M, F>(
 where
     R: Real,
     M: Manifold<Field = R>,
-    F: Function<Point = M::Point, Field = R>,
+    F: Fn(&M::Point) -> R,
 {
     let mut alpha = params.alpha0;
     let tau = params.tau;

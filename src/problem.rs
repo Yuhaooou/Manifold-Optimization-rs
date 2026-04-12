@@ -1,110 +1,33 @@
 use crate::manifolds::Manifold;
 use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, RandomPoint};
-use crate::utils::traits::RCLike;
-
-/// Objective function defined on a manifold point.
-pub trait Function {
-    /// Point type for function input.
-    type Point;
-
-    /// Scalar output type of the objective.
-    type Field: RCLike;
-
-    /// Evaluate objective value at `x`.
-    fn value(&self, x: &Self::Point) -> Self::Field;
-}
-
-/// Euclidean gradient provider for an objective.
-pub trait EGradient {
-    /// Point type for gradient evaluation.
-    type Point;
-
-    /// Euclidean gradient type.
-    type Gradient;
-
-    /// Compute Euclidean gradient at `x`.
-    fn euclidean_gradient(&self, x: &Self::Point) -> Self::Gradient;
-}
-
-/// Marker trait for functions with Euclidean gradient.
-pub trait FuncWithEGrad<Field, Point, Gradient>:
-    Function<Point = Point, Field = Field> + EGradient<Point = Point, Gradient = Gradient>
-{
-}
-
-impl<Field, Point, Gradient, T> FuncWithEGrad<Field, Point, Gradient> for T where
-    T: Function<Point = Point, Field = Field> + EGradient<Point = Point, Gradient = Gradient>
-{
-}
-
-/// Euclidean Hessian provider for an objective.
-pub trait EHessian {
-    /// Point type for Hessian evaluation.
-    type Point;
-
-    /// Direction type for Hessian-vector products.
-    type Direction;
-
-    /// Output type of Hessian action.
-    type Hessian;
-
-    /// Compute Euclidean Hessian action at `x` along direction `u`.
-    fn euclidean_hessian(&self, x: &Self::Point, u: &Self::Direction) -> Self::Hessian;
-}
-
-/// Marker trait for functions with Euclidean Hessian.
-pub trait FuncWithEHess<Field, Point, Direction, Hessian>:
-    Function<Point = Point, Field = Field>
-    + EHessian<Point = Point, Direction = Direction, Hessian = Hessian>
-{
-}
-
-impl<Field, Point, Direction, Hessian, T> FuncWithEHess<Field, Point, Direction, Hessian> for T where
-    T: Function<Point = Point, Field = Field>
-        + EHessian<Point = Point, Direction = Direction, Hessian = Hessian>
-{
-}
-
-/// Marker trait for functions with both Euclidean gradient and Hessian.
-pub trait FuncWithEGradEHess<Field, Point, Gradient, Direction, Hessian>:
-    Function<Point = Point, Field = Field>
-    + EGradient<Point = Point, Gradient = Gradient>
-    + EHessian<Point = Point, Direction = Direction, Hessian = Hessian>
-{
-}
-
-impl<Field, Point, Gradient, Direction, Hessian, T>
-    FuncWithEGradEHess<Field, Point, Gradient, Direction, Hessian> for T
-where
-    T: Function<Point = Point, Field = Field>
-        + EGradient<Point = Point, Gradient = Gradient>
-        + EHessian<Point = Point, Direction = Direction, Hessian = Hessian>,
-{
-}
 
 #[derive(Debug, Clone)]
 /// Optimization problem coupling a manifold and an objective function.
-pub struct Problem<'a, M, F>
+pub struct Problem<'a, M, F, G = (), H = ()>
 where
     M: Manifold,
-    F: Function<Point = M::Point>,
+    F: Fn(&M::Point) -> M::Field,
 {
     pub(crate) manifold: &'a M,
-    pub(crate) function: &'a F,
-    initial_point: M::Point,
+    function: F,
+    gradient: G,
+    hessian: H,
+    init_point: M::Point,
 }
 
 impl<'a, M, F> Problem<'a, M, F>
 where
     M: Manifold,
-    F: Function<Point = M::Point>,
+    F: Fn(&M::Point) -> M::Field,
 {
     /// Create a new optimization problem.
-    pub fn new_with_init_point(manifold: &'a M, function: &'a F, init_point: M::Point) -> Self {
+    pub fn new_with_init_point(manifold: &'a M, function: F, init_point: M::Point) -> Self {
         Problem {
             manifold,
             function,
-            initial_point: init_point,
+            gradient: (),
+            hessian: (),
+            init_point,
         }
     }
 }
@@ -112,37 +35,64 @@ where
 impl<'a, M, F> Problem<'a, M, F>
 where
     M: Manifold + RandomPoint,
-    F: Function<Point = M::Point>,
+    F: Fn(&M::Point) -> M::Field,
 {
     /// Create a new optimization problem.
-    pub fn new(manifold: &'a M, function: &'a F) -> Self {
+    pub fn new(manifold: &'a M, function: F) -> Self {
         let init_point = manifold.random_point();
         Problem {
             manifold,
             function,
-            initial_point: init_point,
+            gradient: (),
+            hessian: (),
+            init_point,
         }
     }
 }
 
-impl<M, F> Problem<'_, M, F>
+impl<'a, M, F, G, H> Problem<'a, M, F, G, H>
 where
     M: Manifold,
-    F: Function<Point = M::Point>,
+    F: Fn(&M::Point) -> M::Field,
 {
+    pub fn with_rgrad<NG>(self, g: NG) -> Problem<'a, M, F, NG, H>
+    where
+        NG: Fn(&M::Point) -> M::TangentVector,
+    {
+        Problem {
+            manifold: self.manifold,
+            function: self.function,
+            gradient: g,
+            hessian: self.hessian,
+            init_point: self.init_point,
+        }
+    }
+
+    pub fn with_rhess<NH>(self, h: NH) -> Problem<'a, M, F, G, NH>
+    where
+        NH: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
+    {
+        Problem {
+            manifold: self.manifold,
+            function: self.function,
+            gradient: self.gradient,
+            hessian: h,
+            init_point: self.init_point,
+        }
+    }
+
     /// Get the configured initial point.
     pub fn get_initial_point(&self) -> &M::Point {
-        &self.initial_point
+        &self.init_point
     }
 
     /// Set a new initial point, returning the old one.
     pub fn set_new_initial_point(&mut self, new_init: M::Point) -> M::Point {
-        std::mem::replace(&mut self.initial_point, new_init)
+        std::mem::replace(&mut self.init_point, new_init)
     }
 
-    /// Evaluate objective value at point `x`.
-    pub fn value(&self, x: &M::Point) -> F::Field {
-        self.function.value(x)
+    pub fn value(&self, x: &M::Point) -> M::Field {
+        (self.function)(x)
     }
 
     /// Norm induced by manifold metric.
@@ -166,53 +116,83 @@ where
     }
 }
 
-impl<M, F> Problem<'_, M, F>
+impl<'a, M, F, G, H> Problem<'a, M, F, G, H>
 where
-    M: Manifold + EGradToRGrad,
-    F: FuncWithEGrad<M::Field, M::Point, M::AmbientPoint>,
+    M: Manifold,
+    F: Fn(&M::Point) -> M::Field,
+    G: Fn(&M::Point) -> M::TangentVector,
 {
-    /// Euclidean gradient of the objective.
-    pub fn euclidean_gradient(&self, x: &M::Point) -> M::AmbientPoint {
-        self.function.euclidean_gradient(x)
-    }
-
-    /// Convert Euclidean gradient to Riemannian gradient.
-    pub fn egrad_to_rgrad(&self, x: &M::Point, egrad: &M::AmbientPoint) -> M::TangentVector {
-        self.manifold.egrad_to_rgrad(x, egrad)
-    }
-
-    /// Riemannian gradient of the objective.
-    pub fn gradient(&self, x: &M::Point) -> M::TangentVector {
-        let egrad = self.euclidean_gradient(x);
-        self.egrad_to_rgrad(x, &egrad)
+    pub fn gradient(&self, point: &M::Point) -> M::TangentVector {
+        (self.gradient)(point)
     }
 }
 
-impl<M, F> Problem<'_, M, F>
+impl<'a, M, F, G, H> Problem<'a, M, F, G, H>
+where
+    M: Manifold + EGradToRGrad,
+    F: Fn(&M::Point) -> M::Field,
+{
+    pub fn with_egrad<EG>(
+        self,
+        g: EG,
+    ) -> Problem<'a, M, F, impl Fn(&M::Point) -> M::TangentVector, H>
+    where
+        EG: Fn(&M::Point) -> M::AmbientPoint,
+    {
+        let gradient = move |x: &M::Point| self.manifold.egrad_to_rgrad(x, &g(x));
+
+        Problem {
+            manifold: self.manifold,
+            init_point: self.init_point,
+            function: self.function,
+            gradient,
+            hessian: self.hessian,
+        }
+    }
+}
+
+impl<'a, M, F, G, H> Problem<'a, M, F, G, H>
+where
+    M: Manifold,
+    F: Fn(&M::Point) -> M::Field,
+    H: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
+{
+    pub fn hessian(&self, point: &M::Point, tangent_vector: &M::TangentVector) -> M::TangentVector {
+        (self.hessian)(point, tangent_vector)
+    }
+}
+
+impl<'a, M, F, G, H> Problem<'a, M, F, G, H>
 where
     M: Manifold + EGradToRGrad + EHessToRHess,
-    F: FuncWithEGradEHess<M::Field, M::Point, M::AmbientPoint, M::TangentVector, M::AmbientPoint>,
+    F: Fn(&M::Point) -> M::Field,
 {
-    /// Euclidean Hessian action of the objective.
-    pub fn euclidean_hessian(&self, x: &M::Point, u: &M::TangentVector) -> M::AmbientPoint {
-        self.function.euclidean_hessian(x, u)
-    }
+    pub fn with_egrad_ehess<EG, EH>(
+        self,
+        g: EG,
+        h: EH,
+    ) -> Problem<'a, M, F, 
+    impl Fn(&M::Point) -> M::TangentVector, 
+    impl Fn(&M::Point, &M::TangentVector) -> M::TangentVector>
+    where
+        EG: Fn(&M::Point) -> M::AmbientPoint + Clone,
+        EH: Fn(&M::Point, &M::TangentVector) -> M::AmbientPoint,
+    {
+        let g1 = g.clone();
+        let gradient = move |x: &M::Point| self.manifold.egrad_to_rgrad(x, &g(x));
 
-    /// Convert Euclidean Hessian action to Riemannian Hessian action.
-    pub fn ehess_to_rhess(
-        &self,
-        x: &M::Point,
-        u: &M::TangentVector,
-        egrad: &M::AmbientPoint,
-        ehess: &M::AmbientPoint,
-    ) -> M::TangentVector {
-        self.manifold.ehess_to_rhess(x, u, egrad, ehess)
-    }
+        let hessian = move |x: &M::Point, u: &M::TangentVector| {
+            let egrad = g1(x);
+            let ehess = h(x, u);
+            self.manifold.ehess_to_rhess(x, u, &egrad, &ehess)
+        };
 
-    /// Riemannian Hessian action.
-    pub fn hessian(&self, x: &M::Point, u: &M::TangentVector) -> M::TangentVector {
-        let egrad = self.euclidean_gradient(x);
-        let ehess = self.euclidean_hessian(x, u);
-        self.ehess_to_rhess(x, u, &egrad, &ehess)
+        Problem {
+            manifold: self.manifold,
+            init_point: self.init_point,
+            function: self.function,
+            gradient,
+            hessian,
+        }
     }
 }

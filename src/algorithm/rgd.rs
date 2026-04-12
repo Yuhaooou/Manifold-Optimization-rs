@@ -2,7 +2,7 @@ use crate::algorithm::Status;
 use crate::algorithm::line_search::{BackTrackingParams, back_tracking};
 use crate::manifolds::Manifold;
 use crate::manifolds::manifold::EGradToRGrad;
-use crate::problem::{FuncWithEGrad, Function, Problem};
+use crate::problem::Problem;
 use crate::utils::traits::Real;
 
 const DEFAULT_MIN_GRAD_NORM: f64 = 1e-8;
@@ -10,13 +10,14 @@ const DEFAULT_MIN_STEP_SIZE: f64 = 1e-12;
 const DEFAULT_MAX_ITERATIONS: usize = 1000;
 
 /// Riemannian Gradient Descent solver.
-pub struct RGD<'a, 'b, R, M, F>
+pub struct RGD<'a, 'b, R, M, F, G, H>
 where
     R: Real,
     M: Manifold,
-    F: Function<Point = M::Point>,
+    F: Fn(&M::Point) -> M::Field,
+    G: Fn(&M::Point) -> M::TangentVector,
 {
-    problem: &'a mut Problem<'b, M, F>,
+    problem: &'a mut Problem<'b, M, F, G, H>,
     min_grad_norm: R,
     min_step_size: R,
     max_iterations: usize,
@@ -50,15 +51,16 @@ where
     }
 }
 
-impl<'a, 'b, R, M, F> RGD<'a, 'b, R, M, F>
+impl<'a, 'b, R, M, F, G, H> RGD<'a, 'b, R, M, F, G, H>
 where
     R: Real,
     M: Manifold<Field = R> + EGradToRGrad,
-    F: FuncWithEGrad<R, M::Point, M::AmbientPoint>,
+    F: Fn(&M::Point) -> M::Field,
+    G: Fn(&M::Point) -> M::TangentVector,
 {
     /// Create an RGD solver with default stopping parameters.
     pub fn new(
-        problem: &'a mut Problem<'b, M, F>,
+        problem: &'a mut Problem<'b, M, F, G, H>,
         linesearch_params: &'a BackTrackingParams<R>,
     ) -> Self {
         Self {

@@ -53,34 +53,6 @@ pub trait Real:
     fn subi(self, rhs: i32) -> Self;
     fn muli(self, rhs: i32) -> Self;
     fn divi(self, rhs: i32) -> Self;
-
-    // fn max(self, other: Self) -> Self {
-    //     NumFloat::max(self, other)
-    // }
-
-    // fn min(self, other: Self) -> Self {
-    //     NumFloat::min(self, other)
-    // }
-
-    // fn sqrt(self) -> Self {
-    //     NumFloat::sqrt(self)
-    // }
-
-    // fn cos(self) -> Self {
-    //     NumFloat::cos(self)
-    // }
-
-    // fn sin(self) -> Self {
-    //     NumFloat::sin(self)
-    // }
-
-    // fn acos(self) -> Self {
-    //     NumFloat::acos(self)
-    // }
-
-    // fn asin(self) -> Self {
-    //     NumFloat::asin(self)
-    // }
 }
 
 impl Real for f64 {

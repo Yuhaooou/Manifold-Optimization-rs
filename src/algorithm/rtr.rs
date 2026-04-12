@@ -2,8 +2,7 @@ use derive_new::new;
 
 use crate::algorithm::Status;
 use crate::manifolds::Manifold;
-use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess};
-use crate::problem::{FuncWithEGrad, Problem};
+use crate::problem::Problem;
 use crate::utils::traits::{Real, Vector};
 
 const DEFAULT_MIN_GRAD_NORM: f64 = 1e-6;
@@ -13,37 +12,16 @@ const DEFAULT_KAPPA: f64 = 0.1;
 const DEFAULT_THETA: f64 = 1.0;
 const DEFAULT_MAX_INNER_ITERATIONS: usize = 500;
 
-pub trait RTRHessian<M: Manifold> {
-    const USE_APPROX: bool = false;
-
-    fn use_approx(&self) -> bool {
-        Self::USE_APPROX
-    }
-
-    fn euclidean_hessian(&self, x: &M::Point, u: &M::TangentVector) -> M::AmbientPoint {
-        let _ = (x, u);
-        unimplemented!("euclidean_hessian is not implemented for this function")
-    }
-
-    fn hessian_approx(
-        &self,
-        point: &M::Point,
-        tangent_vector: &M::TangentVector,
-    ) -> M::TangentVector {
-        let _ = (point, tangent_vector);
-        unimplemented!("hessian_approx is not implemented for this function")
-    }
-}
-
-// #[derive(Builder)]
 /// Riemannian Trust-Region solver.
-pub struct RTR<'a, 'b, R, M, F>
+pub struct RTR<'a, 'b, R, M, F, G, H>
 where
     R: Real,
     M: Manifold,
-    F: FuncWithEGrad<R, M::Point, M::AmbientPoint> + RTRHessian<M>,
+    F: Fn(&M::Point) -> M::Field,
+    G: Fn(&M::Point) -> M::TangentVector,
+    H: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
 {
-    problem: &'a mut Problem<'b, M, F>,
+    problem: &'a mut Problem<'b, M, F, G, H>,
     min_grad_norm: R,
     min_step_size: R,
     max_iterations: usize,
@@ -82,18 +60,16 @@ where
     }
 }
 
-impl<'a, 'b, R, M, F> RTR<'a, 'b, R, M, F>
+impl<'a, 'b, R, M, F, G, H> RTR<'a, 'b, R, M, F, G, H>
 where
     R: Real,
-    M: Manifold,
-    F: FuncWithEGrad<R, M::Point, M::AmbientPoint> + RTRHessian<M>,
+    M: Manifold<Field = R>,
+    F: Fn(&M::Point) -> M::Field,
+    G: Fn(&M::Point) -> M::TangentVector,
+    H: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
 {
-    /// Create an RTR solver.
-    ///
-    /// `max_radius` is the upper bound for trust-region radius.
-    /// `threshold` is the acceptance threshold for `rho`.
-    pub fn new(problem: &'a mut Problem<'b, M, F>, max_radius: R, threshold: R) -> Self {
-        Self {
+    pub fn new(problem: &'a mut Problem<'b, M, F, G, H>, max_radius: R, threshold: R) -> Self {
+        RTR {
             problem,
             min_grad_norm: R::from_f64(DEFAULT_MIN_GRAD_NORM),
             min_step_size: R::from_f64(DEFAULT_MIN_STEP_SIZE),
@@ -106,14 +82,7 @@ where
             verbose: 1,
         }
     }
-}
 
-impl<'a, 'b, R, M, F> RTR<'a, 'b, R, M, F>
-where
-    R: Real,
-    M: Manifold<Field = R> + EGradToRGrad + EHessToRHess,
-    F: FuncWithEGrad<R, M::Point, M::AmbientPoint> + RTRHessian<M>,
-{
     /// Set minimum gradient norm stopping threshold.
     pub fn set_min_grad_norm(mut self, min_grad_norm: R) -> Self {
         self.min_grad_norm = min_grad_norm;
@@ -156,20 +125,6 @@ where
         self
     }
 
-    fn get_hessian(&self, point: &M::Point, tangent_vector: &M::TangentVector) -> M::TangentVector {
-        if self.problem.function.use_approx() {
-            return self.problem.function.hessian_approx(point, tangent_vector);
-        }
-        let egrad = self.problem.euclidean_gradient(point);
-        let ehess = self
-            .problem
-            .function
-            .euclidean_hessian(point, tangent_vector);
-        self.problem
-            .manifold
-            .ehess_to_rhess(point, tangent_vector, &egrad, &ehess)
-    }
-
     // subproblem: m(s) = .5<s, Hs>_x - <b, s>_x, ||s|| <= radius, where b = -gradf_x.
     fn truncate_cg(
         &self,
@@ -185,7 +140,7 @@ where
         }
 
         let subproblem_func = |s| {
-            let hs = self.get_hessian(point, s);
+            let hs = self.problem.hessian(point, s);
             R::half() * self.problem.inner(point, s, &hs) - self.problem.inner(point, b, s)
         };
 
@@ -193,7 +148,7 @@ where
         let r_bound = b_norm * R::min(self.kappa, b_norm.powf(self.theta));
 
         for iter in 1..self.max_inner_iterations {
-            let hp = self.get_hessian(point, &p);
+            let hp = self.problem.hessian(point, &p);
             let p_hp = self.problem.inner(point, &p, &hp);
             let alpha = self.problem.norm(point, &r).powi(2) / p_hp;
             let v_next = v.ref_add(p.ref_mul_num(alpha));
