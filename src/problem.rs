@@ -1,5 +1,4 @@
-use crate::manifolds::Manifold;
-use crate::manifolds::manifold::{EGradToRGrad, EHessToRHess, RandomPoint};
+use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint};
 
 #[derive(Debug, Clone)]
 /// Optimization problem coupling a manifold and an objective function.
@@ -8,7 +7,7 @@ where
     M: Manifold,
     F: Fn(&M::Point) -> M::Field,
 {
-    pub(crate) manifold: &'a M,
+    manifold: &'a M,
     function: F,
     gradient: G,
     hessian: H,
@@ -171,9 +170,13 @@ where
         self,
         g: EG,
         h: EH,
-    ) -> Problem<'a, M, F, 
-    impl Fn(&M::Point) -> M::TangentVector, 
-    impl Fn(&M::Point, &M::TangentVector) -> M::TangentVector>
+    ) -> Problem<
+        'a,
+        M,
+        F,
+        impl Fn(&M::Point) -> M::TangentVector,
+        impl Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
+    >
     where
         EG: Fn(&M::Point) -> M::AmbientPoint + Clone,
         EH: Fn(&M::Point, &M::TangentVector) -> M::AmbientPoint,

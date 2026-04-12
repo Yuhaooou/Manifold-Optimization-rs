@@ -84,10 +84,11 @@ where
 ///
 /// Because ndarray-linalg does not expose a dedicated truncated SVD API,
 /// this function computes full SVD and slices the leading `r` components.
-pub fn tsvd<D>(mat: &Array2<D>, r: usize) -> Result<(Array2<D>, Array1<D>, Array2<D>), Errors>
+pub fn tsvd<D>(mat: &Array2<D>) -> Result<(Array2<D>, Array1<D>, Array2<D>), Errors>
 where
     D: Lapack<Real = D>,
 {
+    let r = mat.shape()[0].min(mat.shape()[1]);
     // TODO: directly use *gesvd to get truncated SVD.
     if let Ok((Some(u), s, Some(vt))) = mat.svd(true, true) {
         let u_truncated = u.slice(s![.., ..r]).to_owned();

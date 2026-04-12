@@ -5,10 +5,9 @@ use rand::Rng;
 use rand_distr::{Distribution, StandardNormal};
 
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint};
-use crate::utils::tools::tsvd;
 use crate::utils::{
     inner_product::InnerProduct,
-    tools::{mat_sym, qr},
+    tools::{mat_sym, qr, tsvd},
     traits::{RCLike, Real},
 };
 
@@ -75,8 +74,7 @@ where
     where
         D: Lapack<Real = D> + Real,
     {
-        let r = point.shape()[0].min(point.shape()[1]);
-        let (u, _, vt) = tsvd(&(point + tangent_vector), r).unwrap();
+        let (u, _, vt) = tsvd(&(point + tangent_vector)).unwrap();
         u.dot(&vt)
     }
 

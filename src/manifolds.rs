@@ -8,6 +8,8 @@ pub mod stiefel;
 
 // pub use fixed_rank::FixedRank;
 pub use grassmann::Grassmann;
-pub use manifold::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint, RandomTangentVector};
+pub use manifold::{
+    EGradToRGrad, EHessToRHess, Exp, Log, Manifold, RandomPoint, RandomTangentVector,
+};
 pub use sphere::Sphere;
 pub use stiefel::Stiefel;

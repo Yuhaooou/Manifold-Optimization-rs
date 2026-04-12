@@ -1,7 +1,6 @@
 use crate::algorithm::Status;
 use crate::algorithm::line_search::{BackTrackingParams, back_tracking};
 use crate::manifolds::Manifold;
-use crate::manifolds::manifold::EGradToRGrad;
 use crate::problem::Problem;
 use crate::utils::traits::Real;
 
@@ -54,7 +53,7 @@ where
 impl<'a, 'b, R, M, F, G, H> RGD<'a, 'b, R, M, F, G, H>
 where
     R: Real,
-    M: Manifold<Field = R> + EGradToRGrad,
+    M: Manifold<Field = R>,
     F: Fn(&M::Point) -> M::Field,
     G: Fn(&M::Point) -> M::TangentVector,
 {
