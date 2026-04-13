@@ -8,7 +8,7 @@ use rand::{
     },
 };
 
-use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint};
+use crate::{manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint}, random_point_forward};
 use crate::utils::traits::{InnerProduct, Norm, RCLike, Real};
 
 #[derive(Debug, Clone)]
@@ -117,24 +117,7 @@ impl<D> RandomPoint for Sphere<D>
 where
     D: Real + ScalarOperand + SampleUniform,
 {
-    /// Sample a random point and normalize it onto the sphere.
-    fn random_point(&self) -> Array1<D> {
-        self.random_point_impl(Uniform::new(-D::one(), D::one()).unwrap(), &mut rand::rng())
-    }
-
-    fn random_point_with_rng<R>(&self, rng: &mut R) -> Self::Point
-    where
-        R: Rng + ?Sized,
-    {
-        self.random_point_impl(Uniform::new(-D::one(), D::one()).unwrap(), rng)
-    }
-
-    fn random_point_with_dist<Dist>(&self, dist: Dist) -> Self::Point
-    where
-        Dist: Distribution<Self::Field>,
-    {
-        self.random_point_impl(dist, &mut rand::rng())
-    }
+    random_point_forward!(Uniform::new(-D::one(), D::one()).unwrap());
 
     fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
     where

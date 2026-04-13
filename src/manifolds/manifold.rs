@@ -111,6 +111,29 @@ pub trait RandomPoint: Manifold {
         R: Rng + ?Sized;
 }
 
+#[macro_export]
+macro_rules! random_point_forward {
+    ($dist:expr) => {
+        fn random_point(&self) -> Self::Point {
+            self.random_point_impl($dist, &mut rand::rng())
+        }
+
+        fn random_point_with_rng<R>(&self, rng: &mut R) -> Self::Point
+        where
+            R: Rng + ?Sized,
+        {
+            self.random_point_impl($dist, rng)
+        }
+
+        fn random_point_with_dist<Dist>(&self, dist: Dist) -> Self::Point
+        where
+            Dist: Distribution<D>,
+        {
+            self.random_point_impl(dist, &mut rand::rng())
+        }
+    };
+}
+
 pub trait RandomTangentVector: Manifold {
     /// Generate a random tangent vector at `point`.
     fn random_tangent_vector(&self, point: &Self::Point) -> Self::TangentVector;
