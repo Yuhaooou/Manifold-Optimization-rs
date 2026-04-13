@@ -1,7 +1,8 @@
-use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint};
+use crate::manifolds::manifold::*;
 
 #[derive(Debug, Clone)]
-/// Optimization problem coupling a manifold and an objective function.
+/// Optimization problem with manifold(M), cost function(F), Riemannian gradient(G),
+/// Riemannian hessian(H) and init point.
 pub struct Problem<'a, M, F, G = (), H = ()>
 where
     M: Manifold,
@@ -19,7 +20,7 @@ where
     M: Manifold,
     F: Fn(&M::Point) -> M::Field,
 {
-    /// Create a new optimization problem.
+    /// Create a new problem with manifold, cost function and init point.
     pub fn new_with_init_point(manifold: &'a M, function: F, init_point: M::Point) -> Self {
         Problem {
             manifold,
@@ -36,16 +37,16 @@ where
     M: Manifold + RandomPoint,
     F: Fn(&M::Point) -> M::Field,
 {
-    /// Create a new optimization problem.
+    /// Create a new problem with manifold and cost function.
     pub fn new(manifold: &'a M, function: F) -> Self {
         let init_point = manifold.random_point();
-        Problem {
-            manifold,
-            function,
-            gradient: (),
-            hessian: (),
-            init_point,
-        }
+        Self::new_with_init_point(manifold, function, init_point)
+    }
+
+    /// Create a new problem with manifold, cost function and rng to get init point.
+    pub fn new_with_rng<R: rand::Rng + ?Sized>(manifold: &'a M, function: F, rng: &mut R) -> Self {
+        let init_point = manifold.random_point_with_rng(rng);
+        Self::new_with_init_point(manifold, function, init_point)
     }
 }
 
@@ -90,7 +91,7 @@ where
         std::mem::replace(&mut self.init_point, new_init)
     }
 
-    pub fn value(&self, x: &M::Point) -> M::Field {
+    pub fn function(&self, x: &M::Point) -> M::Field {
         (self.function)(x)
     }
 
@@ -105,13 +106,43 @@ where
     }
 
     /// Retract a tangent vector back to the manifold.
-    pub fn retraction(&self, x: &M::Point, u: &M::TangentVector) -> M::Point {
-        self.manifold.retraction(x, u)
+    pub fn retraction(&self, x: &M::Point, v: &M::TangentVector) -> M::Point {
+        self.manifold.retraction(x, v)
     }
 
     /// Project an ambient vector to tangent space.
-    pub fn projection(&self, x: &M::Point, u: &M::AmbientPoint) -> M::TangentVector {
-        self.manifold.projection(x, u)
+    pub fn projection(&self, x: &M::Point, v: &M::AmbientPoint) -> M::TangentVector {
+        self.manifold.projection(x, v)
+    }
+}
+
+impl<'a, M, F, G, H> Problem<'a, M, F, G, H>
+where
+    M: Manifold + Exp,
+    F: Fn(&M::Point) -> M::Field,
+{
+    pub fn exp(&self, x: &M::Point, v: &M::TangentVector) -> M::Point {
+        self.manifold.exp(x, v)
+    }
+}
+
+impl<'a, M, F, G, H> Problem<'a, M, F, G, H>
+where
+    M: Manifold + Log,
+    F: Fn(&M::Point) -> M::Field,
+{
+    pub fn log(&self, x: &M::Point, y: &M::Point) -> M::TangentVector {
+        self.manifold.log(x, y)
+    }
+}
+
+impl<'a, M, F, G, H> Problem<'a, M, F, G, H>
+where
+    M: Manifold + Transport,
+    F: Fn(&M::Point) -> M::Field,
+{
+    pub fn transport(&self, x: &M::Point, y: &M::Point, v: &M::TangentVector) -> M::TangentVector {
+        self.manifold.transport(x, y, v)
     }
 }
 
@@ -121,8 +152,8 @@ where
     F: Fn(&M::Point) -> M::Field,
     G: Fn(&M::Point) -> M::TangentVector,
 {
-    pub fn gradient(&self, point: &M::Point) -> M::TangentVector {
-        (self.gradient)(point)
+    pub fn gradient(&self, x: &M::Point) -> M::TangentVector {
+        (self.gradient)(x)
     }
 }
 
@@ -156,8 +187,8 @@ where
     F: Fn(&M::Point) -> M::Field,
     H: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
 {
-    pub fn hessian(&self, point: &M::Point, tangent_vector: &M::TangentVector) -> M::TangentVector {
-        (self.hessian)(point, tangent_vector)
+    pub fn hessian(&self, x: &M::Point, v: &M::TangentVector) -> M::TangentVector {
+        (self.hessian)(x, v)
     }
 }
 
@@ -184,10 +215,10 @@ where
         let g1 = g.clone();
         let gradient = move |x: &M::Point| self.manifold.egrad_to_rgrad(x, &g(x));
 
-        let hessian = move |x: &M::Point, u: &M::TangentVector| {
+        let hessian = move |x: &M::Point, v: &M::TangentVector| {
             let egrad = g1(x);
-            let ehess = h(x, u);
-            self.manifold.ehess_to_rhess(x, u, &egrad, &ehess)
+            let ehess = h(x, v);
+            self.manifold.ehess_to_rhess(x, v, &egrad, &ehess)
         };
 
         Problem {

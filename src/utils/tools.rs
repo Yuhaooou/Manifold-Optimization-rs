@@ -2,7 +2,7 @@ use core::fmt;
 use std::error::Error;
 
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::{Lapack, QR, SVD, Scalar};
+use ndarray_linalg::{Lapack, QR, SVD};
 
 use crate::utils::traits::Real;
 
@@ -24,30 +24,19 @@ impl fmt::Display for Errors {
 
 impl Error for Errors {}
 
-/// Common result type used by helper routines.
-pub type AlgorithmResult<T> = Result<T, Errors>;
-
-/// Convert an f64 literal to a generic scalar type.
-pub fn get_scalar_from_float<D>(f: f64) -> D
-where
-    D: Scalar,
-{
-    D::from_real(D::real(f))
-}
-
 /// Return the symmetric part of a square matrix: `(A + A^T) / 2`.
 ///
 /// # Panics
 /// Panics if `mat` is not square.
 pub fn mat_sym<D>(mat: &Array2<D>) -> Array2<D>
 where
-    D: Scalar + ScalarOperand,
+    D: Real + ScalarOperand,
 {
     assert!(
         mat.shape()[0] == mat.shape()[1],
         "Input must be a square matrix."
     );
-    (mat + &mat.t()) / get_scalar_from_float::<D>(2.0)
+    (mat + &mat.t()) / D::from_i8(2).unwrap()
 }
 
 /// Return the skew-symmetric part of a square matrix: `(A - A^T) / 2`.
@@ -56,13 +45,13 @@ where
 /// Panics if `mat` is not square.
 pub fn mat_skew<D>(mat: &Array2<D>) -> Array2<D>
 where
-    D: Scalar + ScalarOperand,
+    D: Real + ScalarOperand,
 {
     assert!(
         mat.shape()[0] == mat.shape()[1],
         "Input must be a square matrix."
     );
-    (mat - &mat.t()) / get_scalar_from_float::<D>(2.0)
+    (mat - &mat.t()) / D::from_i8(2).unwrap()
 }
 
 /// QR decomposition helper.
@@ -73,7 +62,7 @@ where
     D: Lapack + Real,
 {
     if let Ok((q, r)) = mat.qr() {
-        let sign = r.diag().signum();
+        let sign = r.diag().mapv(|x| x.signum());
         Ok(q * sign)
     } else {
         Err(Errors::ComputeError("QR Decomposition".to_string()))

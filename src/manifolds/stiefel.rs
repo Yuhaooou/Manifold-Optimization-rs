@@ -6,9 +6,8 @@ use rand_distr::{Distribution, StandardNormal};
 
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint};
 use crate::utils::{
-    inner_product::InnerProduct,
     tools::{mat_sym, qr, tsvd},
-    traits::{RCLike, Real},
+    traits::{InnerProduct, RCLike, Real},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,7 +32,7 @@ where
 
 impl<D> Stiefel<D>
 where
-    D: RCLike,
+    D: RCLike + Lapack<Real = D>,
 {
     /// Create `St(n, p)` with default QR retraction.
     pub fn new(n: usize, p: usize) -> Self {
@@ -117,7 +116,7 @@ where
     fn projection(&self, point: &Array2<D>, ambient_point: &Self::TangentVector) -> Self::Point {
         let tmp1 = (Array::eye(self.n) - point.dot(&point.t())).dot(ambient_point);
         let tmp2 = point.t().dot(ambient_point) - ambient_point.t().dot(point);
-        tmp1 + point.dot(&tmp2) / D::fromi8(2)
+        tmp1 + point.dot(&tmp2) / D::from_i8(2).unwrap()
     }
 
     fn retraction(&self, point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
@@ -161,24 +160,24 @@ where
 {
     /// Sample a random matrix and retract to the manifold.
     fn random_point(&self) -> Array2<D> {
-        self.random_point_with(StandardNormal, &mut rand::rng())
+        self.random_point_impl(StandardNormal, &mut rand::rng())
     }
 
     fn random_point_with_rng<R>(&self, rng: &mut R) -> Self::Point
     where
         R: Rng + ?Sized,
     {
-        self.random_point_with(StandardNormal, rng)
+        self.random_point_impl(StandardNormal, rng)
     }
 
     fn random_point_with_dist<Dist>(&self, dist: Dist) -> Self::Point
     where
         Dist: Distribution<D>,
     {
-        self.random_point_with(dist, &mut rand::rng())
+        self.random_point_impl(dist, &mut rand::rng())
     }
 
-    fn random_point_with<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
+    fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
     where
         Dist: Distribution<Self::Field>,
         R: Rng + ?Sized,

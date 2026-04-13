@@ -1,212 +1,71 @@
 use std::{
-    fmt::{Debug, Display, LowerExp, UpperExp},
+    fmt::Debug,
+    iter::Sum,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-use ndarray_linalg::Scalar;
-use num_complex::{Complex32 as c32, Complex64 as c64};
-use num_traits::{Float as NumFloat, Num, NumCast, One, Zero};
+use nalgebra::{ComplexField, RealField};
+use num_traits::{One, ToPrimitive, Zero};
 
-// Use it always cause multiple applicable items in scope error, so we will not use it.
-// use num_traits::real::Real as NumReal;
-
-/// Real-number trait bound used throughout optimization code.
-pub trait Real:
-    Num
-    + Copy
-    + NumCast
-    + PartialOrd
-    + Neg<Output = Self>
-    + AddAssign
-    + SubAssign
-    + MulAssign
-    + DivAssign
-    + Debug
-    + Display
-    + NumFloat
-    + LowerExp
-    + UpperExp
-    + 'static
-{
-    /// Convert from `f64`.
-    fn from_f64(f: f64) -> Self;
-
-    /// Convert to `f64`.
-    fn to_f64(self) -> f64;
-
-    /// Convert from `f32`.
-    fn from_f32(f: f32) -> Self;
-
-    /// Convert to `f32`.
-    fn to_f32(self) -> f32;
-
-    /// Return 0.5.
-    fn half() -> Self {
-        Self::from_f64(0.5)
-    }
-
-    fn fromi8(i: i8) -> Self {
-        Self::from_f32(i as f32)
-    }
-
-    fn addi(self, rhs: i32) -> Self;
-    fn subi(self, rhs: i32) -> Self;
-    fn muli(self, rhs: i32) -> Self;
-    fn divi(self, rhs: i32) -> Self;
-}
-
-impl Real for f64 {
-    fn from_f64(f: f64) -> Self {
-        f
-    }
-
-    fn to_f64(self) -> f64 {
-        self
-    }
-
-    fn from_f32(f: f32) -> Self {
-        f as f64
-    }
-
-    fn to_f32(self) -> f32 {
-        self as f32
-    }
-
-    fn addi(self, rhs: i32) -> Self {
-        self + (rhs as f64)
-    }
-
-    fn subi(self, rhs: i32) -> Self {
-        self - (rhs as f64)
-    }
-
-    fn muli(self, rhs: i32) -> Self {
-        self * (rhs as f64)
-    }
-
-    fn divi(self, rhs: i32) -> Self {
-        self / (rhs as f64)
-    }
-}
-
-impl Real for f32 {
-    fn from_f64(f: f64) -> Self {
-        f as f32
-    }
-
-    fn to_f64(self) -> f64 {
-        self as f64
-    }
-
-    fn from_f32(f: f32) -> Self {
-        f
-    }
-
-    fn to_f32(self) -> f32 {
-        self
-    }
-
-    fn addi(self, rhs: i32) -> Self {
-        self + (rhs as f32)
-    }
-
-    fn subi(self, rhs: i32) -> Self {
-        self - (rhs as f32)
-    }
-
-    fn muli(self, rhs: i32) -> Self {
-        self * (rhs as f32)
-    }
-
-    fn divi(self, rhs: i32) -> Self {
-        self / (rhs as f32)
-    }
-}
-
-/// Scalar field abstraction used by vectors and manifolds.
-pub trait Field:
-    Zero
-    + One
+pub trait FieldOps:
+    Sized
     + Add<Output = Self>
     + Sub<Output = Self>
     + Mul<Output = Self>
     + Div<Output = Self>
-    + Neg<Output = Self>
     + AddAssign
     + SubAssign
     + MulAssign
     + DivAssign
-    + Debug
-    + Clone
 {
 }
 
-impl Field for c64 {}
-
-impl Field for c32 {}
-
-impl<R> Field for R where R: Real {}
-
-/// Real-or-complex scalar abstraction used by generic vectors.
-pub trait RCLike: Field + Copy + 'static {
-    // Not like [`Scalar`], where [`Scalar::abs`] returns [`Scalar::Real`] type, here it just
-    // returns [`Self`] type. The return type here theoretically ture, because the modulus of
-    // a complex number is a real number, which is still a complex number. Besides, the return type
-    // of [`Scalar::abs`] is not theoretically equal to [`Self::Real`] type, the theoretical return
-    // type should be somethings like $\mathbb{R} \ge 0$, which is hard to implement in Rust.
-    /// Absolute value (modulus) of the Real (complex) number. Returns the same type of the input.
-    fn abs(self) -> Self;
-
-    fn conj(self) -> Self;
-
-    /// Principal square root.
-    fn sqrt(self) -> Self;
-}
-
-impl RCLike for c64 {
-    fn abs(self) -> Self {
-        c64::norm(self).as_c()
-    }
-
-    fn conj(self) -> Self {
-        c64::conj(&self)
-    }
-
-    fn sqrt(self) -> Self {
-        c64::sqrt(self)
-    }
-}
-
-impl RCLike for c32 {
-    fn abs(self) -> Self {
-        c32::norm(self).as_c()
-    }
-
-    fn conj(self) -> Self {
-        c32::conj(&self)
-    }
-
-    fn sqrt(self) -> Self {
-        c32::sqrt(self)
-    }
-}
-
-impl<R> RCLike for R
-where
-    R: Real,
+impl<T> FieldOps for T where
+    T: Sized
+        + Add<Output = Self>
+        + Sub<Output = Self>
+        + Mul<Output = Self>
+        + Div<Output = Self>
+        + AddAssign
+        + SubAssign
+        + MulAssign
+        + DivAssign
 {
-    fn abs(self) -> R {
-        <R as NumFloat>::abs(self)
-    }
+}
 
-    fn conj(self) -> Self {
-        self
-    }
+pub trait Field: Zero + One + FieldOps + Clone {}
 
-    fn sqrt(self) -> Self {
-        <R as NumFloat>::sqrt(self)
+impl<T> Field for T where T: Zero + One + FieldOps + Clone {}
+
+pub trait RCLike: Field + ComplexField + Copy + Sum {
+    fn sqrt(&self) -> Self {
+        self.try_sqrt().expect("Sqrt error")
     }
 }
+
+impl<T> RCLike for T where T: Field + ComplexField + Copy + Sum {}
+
+pub trait Real: Field + RealField + ToPrimitive + Copy + Sum {
+    /// Return 0.5.
+    fn half() -> Self {
+        Self::from_f64(0.5).unwrap()
+    }
+
+    fn addi(self, rhs: i32) -> Self {
+        self + Self::from_i32(rhs).unwrap()
+    }
+    fn subi(self, rhs: i32) -> Self {
+        self - Self::from_i32(rhs).unwrap()
+    }
+    fn muli(self, rhs: i32) -> Self {
+        self * Self::from_i32(rhs).unwrap()
+    }
+    fn divi(self, rhs: i32) -> Self {
+        self / Self::from_i32(rhs).unwrap()
+    }
+}
+
+impl<T> Real for T where T: Field + RealField + ToPrimitive + Copy + Sum {}
 
 /// Algebraic vector operations used by manifold tangent vectors.
 pub trait Vector:
@@ -290,24 +149,22 @@ pub trait Vector:
 // but these properties are gained from the manifold. So these traits are not required for the
 // Manifold::TangentVector. Maybe these traits have no use.
 pub trait Norm {
-    /// Underlying real scalar type for the norm.
-    type Real: Real;
+    type Field: RCLike;
 
     /// Norm value.
-    fn norm(&self) -> Self::Real;
+    fn norm(&self) -> Self::Field;
 }
 
 /// Convenience alias: a vector with norm support.
-pub trait NormedVector<R, K>: Vector<Field = K> + Norm<Real = R> {}
+pub trait NormedVector<K>: Vector<Field = K> + Norm<Field = K> {}
 
 /// Inner product trait for vector-like objects.
 pub trait InnerProduct {
-    /// Underlying real scalar type for the inner product.
-    type Real: Real;
+    type Field: RCLike;
 
     /// Inner product with `rhs`.
-    fn inner(&self, rhs: &Self) -> Self::Real;
+    fn inner(&self, rhs: &Self) -> Self::Field;
 }
 
 /// Convenience alias: a normed vector with inner product.
-pub trait InnerProductVector<R, K>: NormedVector<R, K> + InnerProduct<Real = R> {}
+pub trait InnerProductVector<K>: NormedVector<K> + InnerProduct<Field = K> {}

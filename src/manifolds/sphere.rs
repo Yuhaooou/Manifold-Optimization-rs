@@ -1,5 +1,4 @@
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::{Lapack, Norm};
 use ndarray_rand::RandomExt;
 use rand::{
     Rng,
@@ -10,10 +9,7 @@ use rand::{
 };
 
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint};
-use crate::utils::{
-    inner_product::InnerProduct,
-    traits::{RCLike, Real},
-};
+use crate::utils::traits::{InnerProduct, Norm, RCLike, Real};
 
 #[derive(Debug, Clone)]
 /// Sphere manifold $S^{n-1}$ embedded in Euclidean space.
@@ -64,6 +60,16 @@ where
         Array1::zeros(self.n)
     }
 
+    fn to_manifold(&self, ambient: &Self::AmbientPoint) -> Self::Point {
+        let norm = D::from_real(ambient.norm());
+        if norm == D::zero() {
+            println!("Warning: ambient point is zero vector, returning base point on the sphere");
+            self.base_point()
+        } else {
+            ambient / norm
+        }
+    }
+
     fn inner(
         &self,
         _point: &Self::Point,
@@ -109,34 +115,34 @@ where
 
 impl<D> RandomPoint for Sphere<D>
 where
-    D: Real + ScalarOperand + SampleUniform + Lapack,
+    D: Real + ScalarOperand + SampleUniform,
 {
     /// Sample a random point and normalize it onto the sphere.
     fn random_point(&self) -> Array1<D> {
-        self.random_point_with(Uniform::new(-D::one(), D::one()).unwrap(), &mut rand::rng())
+        self.random_point_impl(Uniform::new(-D::one(), D::one()).unwrap(), &mut rand::rng())
     }
 
     fn random_point_with_rng<R>(&self, rng: &mut R) -> Self::Point
     where
         R: Rng + ?Sized,
     {
-        self.random_point_with(Uniform::new(-D::one(), D::one()).unwrap(), rng)
+        self.random_point_impl(Uniform::new(-D::one(), D::one()).unwrap(), rng)
     }
 
     fn random_point_with_dist<Dist>(&self, dist: Dist) -> Self::Point
     where
         Dist: Distribution<Self::Field>,
     {
-        self.random_point_with(dist, &mut rand::rng())
+        self.random_point_impl(dist, &mut rand::rng())
     }
 
-    fn random_point_with<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
+    fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
     where
         Dist: Distribution<Self::Field>,
         R: Rng + ?Sized,
     {
         let point = Array1::random_using(self.n, dist, rng);
-        &point / D::from_real(point.norm_l2())
+        self.to_manifold(&point)
     }
 }
 
@@ -147,12 +153,12 @@ fn test_sphere() {
     let sphere = Sphere::<f64>::new(r);
 
     let point = sphere.random_point();
-    assert!((point.norm_l2() - 1.).abs() < eps);
+    assert!((point.norm() - 1.).abs() < eps);
 
     let ambient_point = Array1::random(r, Uniform::new(0., 1.).unwrap());
     let tangent_vector = sphere.projection(&point, &ambient_point);
     assert!(point.dot(&tangent_vector).abs() < eps);
 
     let retraction_point = sphere.retraction(&point, &(1.8 * tangent_vector));
-    assert!((retraction_point.norm_l2() - 1.).abs() < eps);
+    assert!((retraction_point.norm() - 1.).abs() < eps);
 }

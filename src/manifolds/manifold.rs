@@ -1,3 +1,4 @@
+use nalgebra::ComplexField;
 use rand::{Rng, distr::Distribution};
 
 use crate::utils::traits::{RCLike, Vector};
@@ -19,14 +20,15 @@ pub trait Manifold: Clone {
     type AmbientPoint: Clone;
 
     /// Return a specific point on the manifold.
-    fn base_point(&self) -> Self::Point {
-        unimplemented!("Base point not implemented for this manifold");
-    }
+    fn base_point(&self) -> Self::Point;
 
     /// Return the zero tangent vector at `point`.
-    fn zero_tangent_vector(&self, point: &Self::Point) -> Self::TangentVector {
-        let _ = point;
-        unimplemented!("Zero tangent vector not implemented for this manifold");
+    fn zero_tangent_vector(&self, point: &Self::Point) -> Self::TangentVector;
+
+    /// Convert ambient vector to a point on the manifold. This method may have no theoretical meaning.
+    fn to_manifold(&self, ambient: &Self::AmbientPoint) -> Self::Point {
+        let _ = ambient;
+        unimplemented!("to_manifold is not implemented for this manifold");
     }
 
     /// Riemannian metric (inner product) at `point`.
@@ -39,7 +41,7 @@ pub trait Manifold: Clone {
 
     /// Norm induced by [`Self::inner`].
     fn norm(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Field {
-        (self.inner(point, tangent_vector, tangent_vector)).sqrt()
+        self.inner(point, tangent_vector, tangent_vector).sqrt()
     }
 
     /// Project ambient vector `ambient` to the tangent space at `point`.
@@ -79,6 +81,16 @@ pub trait Log: Manifold {
     fn log(&self, point: &Self::Point, other: &Self::Point) -> Self::TangentVector;
 }
 
+pub trait Transport: Manifold {
+    /// Parallel transport of tangent vector `v` from `point` to `other`.
+    fn transport(
+        &self,
+        point: &Self::Point,
+        next_point: &Self::Point,
+        tangent_vector: &Self::TangentVector,
+    ) -> Self::TangentVector;
+}
+
 // TODO: Simplify this trait.
 /// Trait for manifolds that can sample random points.
 pub trait RandomPoint: Manifold {
@@ -93,7 +105,7 @@ pub trait RandomPoint: Manifold {
     where
         Dist: Distribution<Self::Field>;
 
-    fn random_point_with<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
+    fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
     where
         Dist: Distribution<Self::Field>,
         R: Rng + ?Sized;
@@ -119,7 +131,7 @@ pub trait RandomTangentVector: Manifold {
     where
         Dist: Distribution<Self::Field>;
 
-    fn random_tangent_vector_with<Dist, R>(
+    fn random_tangent_vector_impl<Dist, R>(
         &self,
         point: &Self::Point,
         dist: Dist,

@@ -5,7 +5,10 @@ use rand::Rng;
 use rand_distr::{Distribution, StandardNormal};
 
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Exp, Manifold, RandomPoint};
-use crate::utils::{inner_product::InnerProduct, tools::tsvd, traits::Real};
+use crate::utils::{
+    tools::tsvd,
+    traits::{InnerProduct, Real},
+};
 
 #[derive(Debug, Clone)]
 /// Grassmann manifold `Gr(n, p)` of `p`-dimensional subspaces in `R^n`.
@@ -113,24 +116,24 @@ where
 {
     /// Sample a random point and project it to `Gr(n, p)` via SVD.
     fn random_point(&self) -> Array2<D> {
-        self.random_point_with(StandardNormal, &mut rand::rng())
+        self.random_point_impl(StandardNormal, &mut rand::rng())
     }
 
     fn random_point_with_rng<R>(&self, rng: &mut R) -> Self::Point
     where
         R: Rng + ?Sized,
     {
-        self.random_point_with(StandardNormal, rng)
+        self.random_point_impl(StandardNormal, rng)
     }
 
     fn random_point_with_dist<Dist>(&self, dist: Dist) -> Self::Point
     where
         Dist: Distribution<D>,
     {
-        self.random_point_with(dist, &mut rand::rng())
+        self.random_point_impl(dist, &mut rand::rng())
     }
 
-    fn random_point_with<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
+    fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
     where
         Dist: Distribution<Self::Field>,
         R: Rng + ?Sized,

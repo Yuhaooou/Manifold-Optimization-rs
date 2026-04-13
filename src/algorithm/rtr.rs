@@ -21,7 +21,7 @@ where
     G: Fn(&M::Point) -> M::TangentVector,
     H: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
 {
-    problem: &'a mut Problem<'b, M, F, G, H>,
+    problem: &'a Problem<'b, M, F, G, H>,
     min_grad_norm: R,
     min_step_size: R,
     max_iterations: usize,
@@ -53,8 +53,16 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "RTRResult:\n")?;
-        write!(f, "    final_value: {:.8e},\n", self.final_value)?;
-        write!(f, "    final_grad_norm: {:.8e},\n", self.final_grad_norm)?;
+        write!(
+            f,
+            "    final_value: {:.8e},\n",
+            self.final_value.to_f64().unwrap()
+        )?;
+        write!(
+            f,
+            "    final_grad_norm: {:.8e},\n",
+            self.final_grad_norm.to_f64().unwrap()
+        )?;
         write!(f, "    iterations: {}.\n", self.iters)?;
         write!(f, "    status: {}.", self.status)
     }
@@ -71,13 +79,13 @@ where
     pub fn new(problem: &'a mut Problem<'b, M, F, G, H>, max_radius: R, threshold: R) -> Self {
         RTR {
             problem,
-            min_grad_norm: R::from_f64(DEFAULT_MIN_GRAD_NORM),
-            min_step_size: R::from_f64(DEFAULT_MIN_STEP_SIZE),
+            min_grad_norm: R::from_f64(DEFAULT_MIN_GRAD_NORM).unwrap(),
+            min_step_size: R::from_f64(DEFAULT_MIN_STEP_SIZE).unwrap(),
             max_iterations: DEFAULT_MAX_ITERATIONS,
             max_radius,
             threshold,
-            kappa: R::from_f64(DEFAULT_KAPPA),
-            theta: R::from_f64(DEFAULT_THETA),
+            kappa: R::from_f64(DEFAULT_KAPPA).unwrap(),
+            theta: R::from_f64(DEFAULT_THETA).unwrap(),
             max_inner_iterations: DEFAULT_MAX_INNER_ITERATIONS,
             verbose: 1,
         }
@@ -135,7 +143,7 @@ where
         let mut v = b.zeros_like();
         let mut r = b.clone();
         let mut p = r.clone();
-        if self.problem.norm(point, &r) < R::epsilon() {
+        if self.problem.norm(point, &r) == R::zero() {
             return (v, R::zero(), Some(0));
         }
 
@@ -147,7 +155,7 @@ where
         let b_norm = self.problem.norm(point, b);
         let r_bound = b_norm * R::min(self.kappa, b_norm.powf(self.theta));
 
-        for iter in 1..self.max_inner_iterations {
+        for iter in 1..=self.max_inner_iterations {
             let hp = self.problem.hessian(point, &p);
             let p_hp = self.problem.inner(point, &p, &hp);
             let alpha = self.problem.norm(point, &r).powi(2) / p_hp;
@@ -184,7 +192,7 @@ where
     /// Run trust-region optimization from the problem's initial point.
     pub fn run(&mut self, mut radius: M::Field) -> RTRResult<R, M> {
         let mut current_point = self.problem.get_initial_point().clone();
-        let mut current_value = self.problem.value(&current_point);
+        let mut current_value = self.problem.function(&current_point);
         let mut grad = self.problem.gradient(&current_point);
         let mut grad_norm = self.problem.norm(&current_point, &grad);
 
@@ -198,11 +206,11 @@ where
             );
         }
 
-        for iter in 1..self.max_iterations {
+        for iter in 1..=self.max_iterations {
             let (step, next_subproblem_value, inner_iters) =
                 self.truncate_cg(&current_point, &-grad, radius);
             let next_point = self.problem.retraction(&current_point, &step);
-            let next_value = self.problem.value(&next_point);
+            let next_value = self.problem.function(&next_point);
 
             grad = self.problem.gradient(&next_point);
             grad_norm = self.problem.norm(&next_point, &grad);
@@ -234,10 +242,10 @@ where
                 current_value = next_value;
             }
 
-            if rho < R::from_f64(0.25) {
-                radius = radius * R::from_f64(0.25);
-            } else if rho > R::from_f64(0.75)
-                || (self.problem.norm(&current_point, &step) - radius).abs() < R::epsilon()
+            if rho < R::from_f64(0.25).unwrap() {
+                radius = radius * R::from_f64(0.25).unwrap();
+            } else if rho > R::from_f64(0.75).unwrap()
+                || (self.problem.norm(&current_point, &step) - radius).abs() == R::zero()
             {
                 radius = R::min(radius.muli(2), self.max_radius);
             }
@@ -247,10 +255,10 @@ where
                     "Iter: {}, Inner iters: {}, Cost: {:.8e}, Grad Norm: {:.8e}, Radius: {:.8e}, rho: {:.4}",
                     iter,
                     inner_iters.map_or("max".to_string(), |x| x.to_string()),
-                    current_value,
-                    grad_norm,
-                    radius,
-                    rho
+                    current_value.to_f64().unwrap(),
+                    grad_norm.to_f64().unwrap(),
+                    radius.to_f64().unwrap(),
+                    rho.to_f64().unwrap()
                 );
             }
         }

@@ -9,7 +9,7 @@ pub mod stiefel;
 // pub use fixed_rank::FixedRank;
 pub use grassmann::Grassmann;
 pub use manifold::{
-    EGradToRGrad, EHessToRHess, Exp, Log, Manifold, RandomPoint, RandomTangentVector,
+    EGradToRGrad, EHessToRHess, Exp, Log, Manifold, RandomPoint, RandomTangentVector, Transport,
 };
 pub use sphere::Sphere;
 pub use stiefel::Stiefel;

@@ -1,7 +1,6 @@
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::{Lapack, Norm};
 
-use crate::utils::traits::{InnerProduct, Norm as VectorNorm, RCLike, Real, Vector};
+use crate::utils::traits::{InnerProduct, Norm as VectorNorm, RCLike, Vector};
 
 impl<D, IxN> Vector for Array<D, IxN>
 where
@@ -67,26 +66,31 @@ where
     }
 }
 
-impl<D, IxN> VectorNorm for Array<D, IxN>
+impl<K, IxN> VectorNorm for Array<K, IxN>
 where
-    D: Real + Lapack<Real = D>,
+    K: RCLike,
     IxN: Dimension,
 {
-    type Real = D;
+    type Field = K;
 
-    fn norm(&self) -> D {
-        self.norm_l2()
+    fn norm(&self) -> K {
+        self.iter().map(|x| x.powi(2)).sum::<K>().sqrt()
     }
 }
 
-impl<D, IxN> InnerProduct for Array<D, IxN>
+impl<K, IxN> InnerProduct for Array<K, IxN>
 where
-    D: Real,
+    K: RCLike,
     IxN: Dimension,
 {
-    type Real = D;
+    type Field = K;
 
-    fn inner(&self, rhs: &Array<D, IxN>) -> D {
-        (self * rhs).sum()
+    // Need optimization.
+    fn inner(&self, rhs: &Array<K, IxN>) -> K {
+        assert!(
+            self.shape() == rhs.shape(),
+            "Inner product requires the same shape"
+        );
+        (self * rhs.mapv(K::conjugate)).sum()
     }
 }

@@ -20,6 +20,7 @@ num-complex = "0.4.6"
 bon = "3.9.1"
 derive-new = "0.7.0"
 rand_distr = "0.5.1"
+nalgebra = "0.34.2"
 
 [target.'cfg(windows)'.build-dependencies]
 vcpkg = "0.2.15"

@@ -16,7 +16,7 @@ where
     F: Fn(&M::Point) -> M::Field,
     G: Fn(&M::Point) -> M::TangentVector,
 {
-    problem: &'a mut Problem<'b, M, F, G, H>,
+    problem: &'a Problem<'b, M, F, G, H>,
     min_grad_norm: R,
     min_step_size: R,
     max_iterations: usize,
@@ -43,8 +43,16 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "RGDResult:\n")?;
-        write!(f, "    final_value: {:.8e},\n", self.final_value)?;
-        write!(f, "    grad_norm: {:.8e},\n", self.final_grad_norm)?;
+        write!(
+            f,
+            "    final_value: {:.8e},\n",
+            self.final_value.to_f64().unwrap()
+        )?;
+        write!(
+            f,
+            "    grad_norm: {:.8e},\n",
+            self.final_grad_norm.to_f64().unwrap()
+        )?;
         write!(f, "    iterations: {}.", self.iters)?;
         write!(f, "    status: {}.", self.status)
     }
@@ -64,8 +72,8 @@ where
     ) -> Self {
         Self {
             problem,
-            min_grad_norm: R::from_f64(DEFAULT_MIN_GRAD_NORM),
-            min_step_size: R::from_f64(DEFAULT_MIN_STEP_SIZE),
+            min_grad_norm: R::from_f64(DEFAULT_MIN_GRAD_NORM).unwrap(),
+            min_step_size: R::from_f64(DEFAULT_MIN_STEP_SIZE).unwrap(),
             max_iterations: DEFAULT_MAX_ITERATIONS,
             back_tracking_params: linesearch_params,
             verbose: 1,
@@ -99,13 +107,13 @@ where
     /// Run optimization until one stopping criterion is met.
     pub fn run(&mut self) -> RGDResult<R, M> {
         let mut current_point = self.problem.get_initial_point().clone();
-        let mut current_value = self.problem.value(&current_point);
+        let mut current_value = self.problem.function(&current_point);
         let mut grad = self.problem.gradient(&current_point);
         let mut grad_norm = self.problem.norm(&current_point, &grad);
 
         if grad_norm < self.min_grad_norm {
             return RGDResult {
-                final_value: self.problem.value(&current_point),
+                final_value: self.problem.function(&current_point),
                 point: current_point,
                 final_grad_norm: grad_norm,
                 iters: 0,
@@ -113,7 +121,7 @@ where
             };
         }
 
-        for iter in 1..self.max_iterations {
+        for iter in 1..=self.max_iterations {
             let (alpha, next_point, _) = back_tracking(
                 &self.problem,
                 &current_point,
@@ -125,7 +133,7 @@ where
 
             grad = self.problem.gradient(&next_point);
             grad_norm = self.problem.norm(&next_point, &grad);
-            let next_value = self.problem.value(&next_point);
+            let next_value = self.problem.function(&next_point);
 
             if alpha < self.min_step_size {
                 return RGDResult {
@@ -151,9 +159,9 @@ where
                 println!(
                     "Iter: {}, Cost: {:.8e}, Grad Norm: {:.8e}, Step Size: {:.8e}",
                     iter,
-                    next_value.to_f64(),
-                    grad_norm.to_f64(),
-                    alpha.to_f64()
+                    next_value.to_f64().unwrap(),
+                    grad_norm.to_f64().unwrap(),
+                    alpha.to_f64().unwrap()
                 );
             }
 
