@@ -1,5 +1,6 @@
+use std::fmt::Display;
+
 use ndarray::prelude::*;
-use num_traits::{Float, NumCast};
 
 use crate::utils::lapack::*;
 
@@ -100,15 +101,38 @@ pub enum SVDBackend {
     GEJSV,
 }
 
-impl SVDBackend {}
+impl Display for SVDBackend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SVDBackend::GESVD => write!(f, "GESVD"),
+            SVDBackend::GESDD => write!(f, "GESDD"),
+            SVDBackend::GESVDQ => write!(f, "GESVDQ"),
+            SVDBackend::GESVDX => write!(f, "GESVDX"),
+            SVDBackend::GESVJ => write!(f, "GESVJ"),
+            SVDBackend::GEJSV => write!(f, "GEJSV"),
+        }
+    }
+}
 
-pub trait LinalgSVD {}
+impl SVDBackend {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            "GESVD" => SVDBackend::GESVD,
+            "GESDD" => SVDBackend::GESDD,
+            "GESVDQ" => SVDBackend::GESVDQ,
+            "GESVDX" => SVDBackend::GESVDX,
+            "GESVJ" => SVDBackend::GESVJ,
+            "GEJSV" => SVDBackend::GEJSV,
+            _ => panic!("Invalid SVD backend: {}", s),
+        }
+    }
+}
 
 /// Thin Svd for F-order matrixm. This funtion will destroy the input matrix.
-fn thin_svd_r_owned_f<T: LapackElem + NumCast>(
+fn thin_svd_r_owned_f<T: LapackSVD>(
     mut mat: Array2<T>,
     backend: SVDBackend,
-) -> (Array2<T>, Array1<T>, Array2<T>) {
+) -> (Array2<T>, Array1<T::Real>, Array2<T>) {
     let (m, n) = mat.dim();
     let r = m.min(n);
     let res_u;
@@ -135,8 +159,8 @@ fn thin_svd_r_owned_f<T: LapackElem + NumCast>(
         SVDBackend::GESVD => {
             let jobu = if m >= n { LapackChar::O } else { LapackChar::S };
             let jobvt = if m >= n { LapackChar::S } else { LapackChar::O };
-            let mut work = [T::default()];
-            let info1 = gesvd_r(
+            let mut work = [T::zero()];
+            let (info1, _) = T::gesvd(
                 jobu,
                 jobvt,
                 m as i32,
@@ -156,7 +180,7 @@ fn thin_svd_r_owned_f<T: LapackElem + NumCast>(
             }
             let work_len = work[0];
             let mut work = Vec::with_capacity(work_len.to_usize().unwrap());
-            let info2 = gesvd_r(
+            let (info2, _) = T::gesvd(
                 jobu,
                 jobvt,
                 m as i32,
@@ -176,13 +200,8 @@ fn thin_svd_r_owned_f<T: LapackElem + NumCast>(
             }
         }
         SVDBackend::GESDD => {
-            let mut vec_i = Vec::with_capacity(8 * r);
-            unsafe {
-                vec_i.set_len(8 * r);
-            }
-
-            let mut work = [T::default()];
-            let info1 = gesdd_r(
+            let mut work = [T::zero()];
+            let (info1, _) = T::gesdd(
                 LapackChar::O,
                 m as i32,
                 n as i32,
@@ -195,14 +214,13 @@ fn thin_svd_r_owned_f<T: LapackElem + NumCast>(
                 n as i32,
                 work.as_mut_ptr(),
                 -1_i32,
-                vec_i.as_mut_ptr(),
             );
             if info1 != 0 {
                 println!("gesvd_r returned non-zero info: {}", info1);
             }
             let work_len = work[0];
             let mut work = Vec::with_capacity(work_len.to_usize().unwrap());
-            let info2 = gesdd_r(
+            let (info2, _) = T::gesdd(
                 LapackChar::O,
                 m as i32,
                 n as i32,
@@ -215,13 +233,12 @@ fn thin_svd_r_owned_f<T: LapackElem + NumCast>(
                 n as i32,
                 work.as_mut_ptr(),
                 work_len.to_i32().unwrap(),
-                vec_i.as_mut_ptr(),
             );
             if info2 != 0 {
                 println!("gesvd_r returned non-zero info: {}", info2);
             }
         }
-        _ => unimplemented!("SVD backend {:?} is not implemented yet", backend),
+        _ => unimplemented!("SVD backend {} is not implemented yet", backend),
     }
     unsafe {
         res_s = Array::from_shape_vec_unchecked(r, vec_s);
@@ -238,31 +255,35 @@ fn thin_svd_r_owned_f<T: LapackElem + NumCast>(
 }
 
 /// Thin Svd for C-order matrix. This funtion will destroy the input matrix.
-fn thin_svd_r_owned_c<T: LapackElem + NumCast>(
+fn thin_svd_r_owned_c<T: LapackSVD>(
     mat: Array2<T>,
     backend: SVDBackend,
-) -> (Array2<T>, Array1<T>, Array2<T>) {
+) -> (Array2<T>, Array1<T::Real>, Array2<T>) {
     let (ut, s, vtt) = thin_svd_r_owned_f(mat.reversed_axes(), backend);
     (vtt.reversed_axes(), s, ut.reversed_axes())
 }
 
+#[allow(private_bounds)]
 /// Thin svd for owned matrix. This funtion will destroy the input matrix.
-pub fn thin_svd_r_owned<T: LapackElem + NumCast>(
+pub fn thin_svd_r_owned<T: LapackSVD>(
     mat: Array2<T>,
     backend: SVDBackend,
-) -> (Array2<T>, Array1<T>, Array2<T>) {
+) -> (Array2<T>, Array1<T::Real>, Array2<T>) {
     if mat.t().is_standard_layout() {
         thin_svd_r_owned_f(mat, backend)
     } else if mat.is_standard_layout() {
         thin_svd_r_owned_c(mat, backend)
     } else {
+        let _ = mat.view();
         unreachable!("Input matrix must be either C-order or F-order"); //?
     }
 }
 
-pub mod test {
+mod test {
     #![allow(dead_code, unused)]
     use ndarray_rand::RandomExt;
+    use num_complex::{Complex32 as c32, Complex64 as c64, ComplexDistribution};
+    use num_traits::Float;
     use rand_distr::{Uniform, uniform::SampleUniform};
 
     use super::{MatrixOrder::*, SVDBackend::*, *};
@@ -272,24 +293,35 @@ pub mod test {
     const EPS_F64: f64 = 1e-12;
     const EPS_F32: f32 = 1e-5;
 
-    fn test_svd<T>(m: usize, n: usize, order: MatrixOrder, backend: SVDBackend, eps: T)
+    fn test_svd_inner<T>(mat: Array2<T>, backend: SVDBackend, eps: T::Real)
     where
-        T: Float + SampleUniform + LapackElem + std::fmt::Debug,
+        T: LapackSVD,
+        T::Real: Float,
     {
-        let sh = if order == F {
-            (m, n).f()
-        } else {
-            (m, n).into_shape_with_order()
-        };
-        let a: Array2<T> = Array::random(sh, Uniform::new(T::zero(), T::one()).unwrap());
-        let (u, s, vt) = thin_svd_r_owned(a.clone(), backend);
+        let (u, s, vt) = thin_svd_r_owned(mat.clone(), backend);
+        let s = s.mapv(T::from_real);
         let a_re = u.dot(&Array2::from_diag(&s)).dot(&vt);
-        let err = (a_re - a)
-            .abs()
+        let err = (a_re - mat)
             .into_iter()
-            .reduce(T::max)
-            .unwrap_or(T::zero());
+            .map(T::abs)
+            .reduce(T::Real::max)
+            .unwrap_or(T::zero().re());
         assert!(err < eps);
+    }
+
+    fn test_svd<T>(m: usize, n: usize, order: MatrixOrder, backend: SVDBackend, eps: T::Real)
+    where
+        T: LapackSVD,
+        T::Real: SampleUniform,
+    {
+        let sh = match order {
+            F => (m, n).f(),
+            C => (m, n).into_shape_with_order(),
+        };
+        let a = Array::random(sh, Uniform::new(T::zero().re(), T::one().re()).unwrap());
+        let b = Array::random(sh, Uniform::new(T::zero().re(), T::one().re()).unwrap());
+        let c = a.mapv(T::from_real) + b.mapv(|x| T::from_real(x) * T::get_i());
+        test_svd_inner(c, backend, eps);
     }
 
     macro_rules! svd_test {
@@ -317,4 +349,21 @@ pub mod test {
     svd_test!(test_f32_gesdd_f_nm, f32, N, M, F, GESDD, EPS_F32);
     svd_test!(test_f32_gesdd_c_mn, f32, M, N, C, GESDD, EPS_F32);
     svd_test!(test_f32_gesdd_c_nm, f32, N, M, C, GESDD, EPS_F32);
+
+    svd_test!(test_c64_gesvd_f_mn, f64, M, N, F, GESVD, EPS_F64);
+    svd_test!(test_c64_gesvd_f_nm, f64, N, M, F, GESVD, EPS_F64);
+    svd_test!(test_c64_gesvd_c_mn, f64, M, N, C, GESVD, EPS_F64);
+    svd_test!(test_c64_gesvd_c_nm, f64, N, M, C, GESVD, EPS_F64);
+    svd_test!(test_c64_gesdd_f_mn, f64, M, N, F, GESDD, EPS_F64);
+    svd_test!(test_c64_gesdd_f_nm, f64, N, M, F, GESDD, EPS_F64);
+    svd_test!(test_c64_gesdd_c_mn, f64, M, N, C, GESDD, EPS_F64);
+    svd_test!(test_c64_gesdd_c_nm, f64, N, M, C, GESDD, EPS_F64);
+    svd_test!(test_c32_gesvd_f_mn, f32, M, N, F, GESVD, EPS_F32);
+    svd_test!(test_c32_gesvd_f_nm, f32, N, M, F, GESVD, EPS_F32);
+    svd_test!(test_c32_gesvd_c_mn, f32, M, N, C, GESVD, EPS_F32);
+    svd_test!(test_c32_gesvd_c_nm, f32, N, M, C, GESVD, EPS_F32);
+    svd_test!(test_c32_gesdd_f_mn, f32, M, N, F, GESDD, EPS_F32);
+    svd_test!(test_c32_gesdd_f_nm, f32, N, M, F, GESDD, EPS_F32);
+    svd_test!(test_c32_gesdd_c_mn, f32, M, N, C, GESDD, EPS_F32);
+    svd_test!(test_c32_gesdd_c_nm, f32, N, M, C, GESDD, EPS_F32);
 }

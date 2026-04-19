@@ -1,7 +1,6 @@
 use ndarray::{ScalarOperand, prelude::*};
 
 use crate::utils::{
-    svd::LinalgSVD,
     traits::{InnerProduct, Norm as VectorNorm, RCLike, Vector},
 };
 
