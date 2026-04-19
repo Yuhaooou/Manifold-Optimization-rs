@@ -129,28 +129,31 @@ impl SVDBackend {
 }
 
 /// Thin Svd for F-order matrixm. This funtion will destroy the input matrix.
-fn thin_svd_r_owned_f<T: LapackSVD>(
+fn thin_svd_r_owned_impl<T: LapackSVD>(
     mut mat: Array2<T>,
+    order: MatrixOrder,
     backend: SVDBackend,
 ) -> (Array2<T>, Array1<T::Real>, Array2<T>) {
-    let (m, n) = mat.dim();
+    // For f-order mat, directly use lapack routines to compute. For c-order mat, we compute mat.t(), so m and n are reversed.
+    let (m, n) = if order.is_f() {
+        mat.dim()
+    } else {
+        (mat.shape()[1], mat.shape()[0])
+    };
     let r = m.min(n);
-    let res_u;
-    let res_s;
-    let res_vt;
-    let mut vec_s = Vec::with_capacity(r);
-    let mut vec_u_or_vt = Vec::with_capacity(r * r);
+    let mut svd_s = Vec::with_capacity(r);
+    let mut svd_u_or_vt = Vec::with_capacity(r * r);
     unsafe {
-        vec_s.set_len(r);
-        vec_u_or_vt.set_len(r * r);
+        svd_s.set_len(r);
+        svd_u_or_vt.set_len(r * r);
     }
     let vec_u = if m >= n {
         None
     } else {
-        Some(vec_u_or_vt.as_mut_ptr())
+        Some(svd_u_or_vt.as_mut_ptr())
     };
     let vec_vt = if m >= n {
-        Some(vec_u_or_vt.as_mut_ptr())
+        Some(svd_u_or_vt.as_mut_ptr())
     } else {
         None
     };
@@ -167,7 +170,7 @@ fn thin_svd_r_owned_f<T: LapackSVD>(
                 n as i32,
                 mat.as_mut_ptr(),
                 m as i32,
-                vec_s.as_mut_ptr(),
+                svd_s.as_mut_ptr(),
                 vec_u,
                 m as i32,
                 vec_vt,
@@ -187,7 +190,7 @@ fn thin_svd_r_owned_f<T: LapackSVD>(
                 n as i32,
                 mat.as_mut_ptr(),
                 m as i32,
-                vec_s.as_mut_ptr(),
+                svd_s.as_mut_ptr(),
                 vec_u,
                 m as i32,
                 vec_vt,
@@ -207,7 +210,7 @@ fn thin_svd_r_owned_f<T: LapackSVD>(
                 n as i32,
                 mat.as_mut_ptr(),
                 m as i32,
-                vec_s.as_mut_ptr(),
+                svd_s.as_mut_ptr(),
                 vec_u,
                 m as i32,
                 vec_vt,
@@ -242,7 +245,7 @@ fn thin_svd_r_owned_f<T: LapackSVD>(
                 n as i32,
                 mat.as_mut_ptr(),
                 m as i32,
-                vec_s.as_mut_ptr(),
+                svd_s.as_mut_ptr(),
                 vec_u,
                 m as i32,
                 vec_vt,
@@ -261,9 +264,16 @@ fn thin_svd_r_owned_f<T: LapackSVD>(
         }
         _ => unimplemented!("SVD backend {} is not implemented yet", backend),
     }
+
+    let res_u;
+    let res_s;
+    let res_vt;
     unsafe {
-        res_s = Array::from_shape_vec_unchecked(r, vec_s);
-        let u_or_vt = Array::from_shape_vec_unchecked((r, r).f(), vec_u_or_vt);
+        res_s = Array::from_shape_vec_unchecked(r, svd_s);
+        let u_or_vt = match order {
+            MatrixOrder::F => Array::from_shape_vec_unchecked((r, r).f(), svd_u_or_vt),
+            MatrixOrder::C => Array::from_shape_vec_unchecked((r, r), svd_u_or_vt),
+        };
         if m >= n {
             res_vt = u_or_vt;
             res_u = mat;
@@ -272,16 +282,12 @@ fn thin_svd_r_owned_f<T: LapackSVD>(
             res_vt = mat;
         }
     }
-    (res_u, res_s, res_vt)
-}
 
-/// Thin Svd for C-order matrix. This funtion will destroy the input matrix.
-fn thin_svd_r_owned_c<T: LapackSVD>(
-    mat: Array2<T>,
-    backend: SVDBackend,
-) -> (Array2<T>, Array1<T::Real>, Array2<T>) {
-    let (ut, s, vtt) = thin_svd_r_owned_f(mat.reversed_axes(), backend);
-    (vtt.reversed_axes(), s, ut.reversed_axes())
+    // For f-order, just return. For c-order, the output of lapack routines are (vt.t(), s, u.t()), need to transpose back.
+    match order {
+        MatrixOrder::F => (res_u, res_s, res_vt),
+        MatrixOrder::C => (res_vt, res_s, res_u),
+    }
 }
 
 #[allow(private_bounds)]
@@ -291,12 +297,12 @@ pub fn thin_svd_r_owned<T: LapackSVD>(
     backend: SVDBackend,
 ) -> (Array2<T>, Array1<T::Real>, Array2<T>) {
     if mat.t().is_standard_layout() {
-        thin_svd_r_owned_f(mat, backend)
+        thin_svd_r_owned_impl(mat, MatrixOrder::F, backend)
     } else if mat.is_standard_layout() {
-        thin_svd_r_owned_c(mat, backend)
+        thin_svd_r_owned_impl(mat, MatrixOrder::C, backend)
     } else {
         let _ = mat.view();
-        unreachable!("Input matrix must be either C-order or F-order"); //?
+        unimplemented!("Input matrix must be either C-order or F-order");
     }
 }
 

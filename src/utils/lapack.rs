@@ -113,6 +113,16 @@ pub enum MatrixOrder {
     F,
 }
 
+impl MatrixOrder {
+    pub fn is_c(self) -> bool {
+        self == MatrixOrder::C
+    }
+
+    pub fn is_f(self) -> bool {
+        self == MatrixOrder::F
+    }
+}
+
 #[inline]
 pub fn to_lapack_complex<T: Copy>(c: &Complex<T>) -> __BindgenComplex<T> {
     // unsafe {
