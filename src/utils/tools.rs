@@ -3,6 +3,7 @@ use std::error::Error;
 
 use ndarray::{ScalarOperand, prelude::*};
 use ndarray_linalg::{Lapack, QR, SVD};
+use num_traits::Float;
 
 use crate::utils::traits::Real;
 
@@ -59,10 +60,11 @@ where
 /// Returns the `Q` factor adjusted by the sign of `diag(R)`.
 pub fn qr<D>(mat: &Array2<D>) -> Result<Array2<D>, Errors>
 where
-    D: Lapack + Real,
+    D: Lapack,
+    D::Real: Float,
 {
     if let Ok((q, r)) = mat.qr() {
-        let sign = r.diag().mapv(|x| x.signum());
+        let sign = r.diag().mapv(|x| D::from_real(x.re().signum()));
         Ok(q * sign)
     } else {
         Err(Errors::ComputeError("QR Decomposition".to_string()))

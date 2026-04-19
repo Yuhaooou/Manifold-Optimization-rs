@@ -21,6 +21,8 @@ bon = "3.9.1"
 derive-new = "0.7.0"
 rand_distr = "0.5.1"
 nalgebra = "0.34.2"
+openblas-src = {version = "0.10.15", features = ["system"]}
+lapack-sys = "0.15.0"
 
 [target.'cfg(windows)'.build-dependencies]
 vcpkg = "0.2.15"

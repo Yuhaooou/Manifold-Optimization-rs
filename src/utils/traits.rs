@@ -145,13 +145,10 @@ pub trait Vector:
     fn nums_like(&self, num: Self::Field) -> Self;
 }
 
-// The tangent space of a (Riemannian) manifold at a point is indeed a normed and inner-product space,
-// but these properties are gained from the manifold. So these traits are not required for the
-// Manifold::TangentVector. Maybe these traits have no use.
 pub trait Norm {
     type Field: RCLike;
 
-    /// Norm value.
+    /// 2-norm for vectors, F-norm for matrices and tensors.
     fn norm(&self) -> Self::Field;
 }
 
