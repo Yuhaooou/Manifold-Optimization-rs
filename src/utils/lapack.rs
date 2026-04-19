@@ -51,6 +51,8 @@ impl LapackChar {
 }
 
 pub trait LapackElem: ComplexFloat + 'static + Zero {
+    const IS_REAL: bool;
+
     fn from_real(r: Self::Real) -> Self;
 
     /// For real types, return 0. For complex types, get the imaginary unit.
@@ -58,6 +60,8 @@ pub trait LapackElem: ComplexFloat + 'static + Zero {
 }
 
 impl LapackElem for f64 {
+    const IS_REAL: bool = true;
+
     fn from_real(r: Self::Real) -> Self {
         r
     }
@@ -68,6 +72,8 @@ impl LapackElem for f64 {
 }
 
 impl LapackElem for f32 {
+    const IS_REAL: bool = true;
+
     fn from_real(r: Self::Real) -> Self {
         r
     }
@@ -78,6 +84,8 @@ impl LapackElem for f32 {
 }
 
 impl LapackElem for c64 {
+    const IS_REAL: bool = false;
+
     fn from_real(r: Self::Real) -> Self {
         Complex::new(r, 0.)
     }
@@ -88,6 +96,8 @@ impl LapackElem for c64 {
 }
 
 impl LapackElem for c32 {
+    const IS_REAL: bool = false;
+
     fn from_real(r: Self::Real) -> Self {
         Complex::new(r, 0.)
     }
@@ -240,8 +250,9 @@ pub(crate) trait LapackGESDD: LapackElem {
         vt: Option<*mut Self>,
         ldvt: i32,
         work: *mut Self,
+        rwork: Option<*mut Self::Real>,
         lwork: i32,
-    ) -> (i32, Option<Vec<Self::Real>>);
+    ) -> (i32, Vec<i32>);
 }
 
 macro_rules! lapack_gesdd_r {
@@ -259,8 +270,9 @@ macro_rules! lapack_gesdd_r {
                 vt: Option<*mut Self>,
                 ldvt: i32,
                 work: *mut Self,
+                _rwork: Option<*mut Self::Real>,
                 lwork: i32,
-            ) -> (i32, Option<Vec<Self::Real>>) {
+            ) -> (i32, Vec<i32>) {
                 let mut info = 0;
                 let mut iwork = unsafe {
                     let mut vec = Vec::with_capacity(8 * m.min(n) as usize);
@@ -284,7 +296,7 @@ macro_rules! lapack_gesdd_r {
                         iwork.as_mut_ptr(),
                         &mut info,
                     );
-                    (info, None)
+                    (info, iwork)
                 }
             }
         }
@@ -309,14 +321,10 @@ macro_rules! lapack_gesdd_c {
                 vt: Option<*mut Self>,
                 ldvt: i32,
                 work: *mut Self,
+                rwork: Option<*mut Self::Real>,
                 lwork: i32,
-            ) -> (i32, Option<Vec<Self::Real>>) {
+            ) -> (i32, Vec<i32>) {
                 let mut info = 0;
-                let mut rwork = unsafe {
-                    let mut vec = Vec::with_capacity(5 * m.min(n) as usize);
-                    vec.set_len(vec.capacity());
-                    vec
-                };
                 let mut iwork = unsafe {
                     let mut vec = Vec::with_capacity(8 * m.min(n) as usize);
                     vec.set_len(vec.capacity());
@@ -336,11 +344,11 @@ macro_rules! lapack_gesdd_c {
                         &ldvt,
                         work as *mut __BindgenComplex<$t>,
                         &lwork,
-                        rwork.as_mut_ptr(),
+                        rwork.unwrap_or(null_mut()) as *mut $t,
                         iwork.as_mut_ptr(),
                         &mut info,
                     );
-                    (info, Some(rwork))
+                    (info, iwork)
                 }
             }
         }

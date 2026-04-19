@@ -213,6 +213,7 @@ fn thin_svd_r_owned_f<T: LapackSVD>(
                 vec_vt,
                 n as i32,
                 work.as_mut_ptr(),
+                None,
                 -1_i32,
             );
             if info1 != 0 {
@@ -220,6 +221,21 @@ fn thin_svd_r_owned_f<T: LapackSVD>(
             }
             let work_len = work[0];
             let mut work = Vec::with_capacity(work_len.to_usize().unwrap());
+            let mut rwork = match T::IS_REAL {
+                true => None,
+                false => Some({
+                    let mx = m.max(n) as usize;
+                    let mn = m.min(n) as usize;
+                    let rwork_len = if mx > 100 * mn {
+                        5 * mn * mn + 5 * mn
+                    } else {
+                        (5 * mn * mx + 5 * mn).max(2 * mx * mn + 2 * mn * mn + mn)
+                    };
+                    let mut vec = Vec::with_capacity(rwork_len);
+                    unsafe { vec.set_len(rwork_len) };
+                    vec
+                }),
+            };
             let (info2, _) = T::gesdd(
                 LapackChar::O,
                 m as i32,
@@ -232,6 +248,11 @@ fn thin_svd_r_owned_f<T: LapackSVD>(
                 vec_vt,
                 n as i32,
                 work.as_mut_ptr(),
+                if T::IS_REAL {
+                    None
+                } else {
+                    Some(rwork.as_mut().unwrap().as_mut_ptr())
+                },
                 work_len.to_i32().unwrap(),
             );
             if info2 != 0 {
@@ -350,20 +371,20 @@ mod test {
     svd_test!(test_f32_gesdd_c_mn, f32, M, N, C, GESDD, EPS_F32);
     svd_test!(test_f32_gesdd_c_nm, f32, N, M, C, GESDD, EPS_F32);
 
-    svd_test!(test_c64_gesvd_f_mn, f64, M, N, F, GESVD, EPS_F64);
-    svd_test!(test_c64_gesvd_f_nm, f64, N, M, F, GESVD, EPS_F64);
-    svd_test!(test_c64_gesvd_c_mn, f64, M, N, C, GESVD, EPS_F64);
-    svd_test!(test_c64_gesvd_c_nm, f64, N, M, C, GESVD, EPS_F64);
-    svd_test!(test_c64_gesdd_f_mn, f64, M, N, F, GESDD, EPS_F64);
-    svd_test!(test_c64_gesdd_f_nm, f64, N, M, F, GESDD, EPS_F64);
-    svd_test!(test_c64_gesdd_c_mn, f64, M, N, C, GESDD, EPS_F64);
-    svd_test!(test_c64_gesdd_c_nm, f64, N, M, C, GESDD, EPS_F64);
-    svd_test!(test_c32_gesvd_f_mn, f32, M, N, F, GESVD, EPS_F32);
-    svd_test!(test_c32_gesvd_f_nm, f32, N, M, F, GESVD, EPS_F32);
-    svd_test!(test_c32_gesvd_c_mn, f32, M, N, C, GESVD, EPS_F32);
-    svd_test!(test_c32_gesvd_c_nm, f32, N, M, C, GESVD, EPS_F32);
-    svd_test!(test_c32_gesdd_f_mn, f32, M, N, F, GESDD, EPS_F32);
-    svd_test!(test_c32_gesdd_f_nm, f32, N, M, F, GESDD, EPS_F32);
-    svd_test!(test_c32_gesdd_c_mn, f32, M, N, C, GESDD, EPS_F32);
-    svd_test!(test_c32_gesdd_c_nm, f32, N, M, C, GESDD, EPS_F32);
+    svd_test!(test_c64_gesvd_f_mn, c64, M, N, F, GESVD, EPS_F64);
+    svd_test!(test_c64_gesvd_f_nm, c64, N, M, F, GESVD, EPS_F64);
+    svd_test!(test_c64_gesvd_c_mn, c64, M, N, C, GESVD, EPS_F64);
+    svd_test!(test_c64_gesvd_c_nm, c64, N, M, C, GESVD, EPS_F64);
+    svd_test!(test_c64_gesdd_f_mn, c64, M, N, F, GESDD, EPS_F64);
+    svd_test!(test_c64_gesdd_f_nm, c64, N, M, F, GESDD, EPS_F64);
+    svd_test!(test_c64_gesdd_c_mn, c64, M, N, C, GESDD, EPS_F64);
+    svd_test!(test_c64_gesdd_c_nm, c64, N, M, C, GESDD, EPS_F64);
+    svd_test!(test_c32_gesvd_f_mn, c32, M, N, F, GESVD, EPS_F32);
+    svd_test!(test_c32_gesvd_f_nm, c32, N, M, F, GESVD, EPS_F32);
+    svd_test!(test_c32_gesvd_c_mn, c32, M, N, C, GESVD, EPS_F32);
+    svd_test!(test_c32_gesvd_c_nm, c32, N, M, C, GESVD, EPS_F32);
+    svd_test!(test_c32_gesdd_f_mn, c32, M, N, F, GESDD, EPS_F32);
+    svd_test!(test_c32_gesdd_f_nm, c32, N, M, F, GESDD, EPS_F32);
+    svd_test!(test_c32_gesdd_c_mn, c32, M, N, C, GESDD, EPS_F32);
+    svd_test!(test_c32_gesdd_c_nm, c32, N, M, C, GESDD, EPS_F32);
 }
