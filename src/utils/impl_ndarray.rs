@@ -93,6 +93,6 @@ where
             self.shape() == rhs.shape(),
             "Inner product requires the same shape"
         );
-        (self * rhs.mapv(K::conjugate)).sum()
+        (self * rhs.mapv(K::conj)).sum()
     }
 }

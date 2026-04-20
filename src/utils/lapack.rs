@@ -1,4 +1,4 @@
-use std::{ffi::c_char, ptr::null_mut};
+use std::{ffi::c_char, fmt::Debug, ptr::null_mut};
 
 use lapack_sys::*;
 use num_complex::{Complex, Complex32 as c32, Complex64 as c64, ComplexFloat};
@@ -50,7 +50,7 @@ impl LapackChar {
     }
 }
 
-pub trait LapackElem: ComplexFloat + 'static + Zero {
+pub trait LapackElem: ComplexFloat + 'static + Debug {
     const IS_REAL: bool;
 
     fn from_real(r: Self::Real) -> Self;
@@ -108,18 +108,18 @@ impl LapackElem for c32 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MatrixOrder {
+pub enum Layout {
     C,
     F,
 }
 
-impl MatrixOrder {
+impl Layout {
     pub fn is_c(self) -> bool {
-        self == MatrixOrder::C
+        self == Layout::C
     }
 
     pub fn is_f(self) -> bool {
-        self == MatrixOrder::F
+        self == Layout::F
     }
 }
 
@@ -131,7 +131,13 @@ pub fn to_lapack_complex<T: Copy>(c: &Complex<T>) -> __BindgenComplex<T> {
     __BindgenComplex { re: c.re, im: c.im }
 }
 
-pub(crate) trait LapackGESVD: LapackElem {
+pub(crate) fn new_uninit_vec<T>(len: usize) -> Vec<T> {
+    let mut vec = Vec::with_capacity(len);
+    unsafe { vec.set_len(len) };
+    vec
+}
+
+pub trait LapackGESVD: LapackElem {
     fn gesvd(
         jobu: LapackChar,
         jobvt: LapackChar,
@@ -205,7 +211,7 @@ macro_rules! lapack_gesvd_c {
                 n: i32,
                 mat: *mut Self,
                 lda: i32,
-                s: *mut <Self as ComplexFloat>::Real,
+                s: *mut Self::Real,
                 u: Option<*mut Self>,
                 ldu: i32,
                 vt: Option<*mut Self>,
@@ -214,11 +220,7 @@ macro_rules! lapack_gesvd_c {
                 lwork: i32,
             ) -> (i32, Option<Vec<Self::Real>>) {
                 let mut info = 0;
-                let mut rwork = unsafe {
-                    let mut vec = Vec::with_capacity(5 * m.min(n) as usize);
-                    vec.set_len(vec.capacity());
-                    vec
-                };
+                let mut rwork = new_uninit_vec(5 * m.min(n) as usize);
                 unsafe {
                     $fun(
                         jobu.as_ptr(),
@@ -247,7 +249,7 @@ macro_rules! lapack_gesvd_c {
 lapack_gesvd_c!(f64, lapack::zgesvd_);
 lapack_gesvd_c!(f32, lapack::cgesvd_);
 
-pub(crate) trait LapackGESDD: LapackElem {
+pub trait LapackGESDD: LapackElem {
     fn gesdd(
         jobz: LapackChar,
         m: i32,
@@ -284,11 +286,7 @@ macro_rules! lapack_gesdd_r {
                 lwork: i32,
             ) -> (i32, Vec<i32>) {
                 let mut info = 0;
-                let mut iwork = unsafe {
-                    let mut vec = Vec::with_capacity(8 * m.min(n) as usize);
-                    vec.set_len(vec.capacity());
-                    vec
-                };
+                let mut iwork = new_uninit_vec(8 * m.min(n) as usize);
                 unsafe {
                     $fun(
                         jobz.as_ptr(),
@@ -325,7 +323,7 @@ macro_rules! lapack_gesdd_c {
                 n: i32,
                 mat: *mut Self,
                 lda: i32,
-                s: *mut <Self as ComplexFloat>::Real,
+                s: *mut Self::Real,
                 u: Option<*mut Self>,
                 ldu: i32,
                 vt: Option<*mut Self>,
@@ -335,11 +333,7 @@ macro_rules! lapack_gesdd_c {
                 lwork: i32,
             ) -> (i32, Vec<i32>) {
                 let mut info = 0;
-                let mut iwork = unsafe {
-                    let mut vec = Vec::with_capacity(8 * m.min(n) as usize);
-                    vec.set_len(vec.capacity());
-                    vec
-                };
+                let mut iwork = new_uninit_vec(8 * m.min(n) as usize);
                 unsafe {
                     $fun(
                         jobz.as_ptr(),
@@ -368,6 +362,6 @@ macro_rules! lapack_gesdd_c {
 lapack_gesdd_c!(f64, lapack::zgesdd_);
 lapack_gesdd_c!(f32, lapack::cgesdd_);
 
-pub(crate) trait LapackSVD: LapackGESVD + LapackGESDD {}
+pub trait LapackRoutines: LapackGESVD + LapackGESDD {}
 
-impl<T> LapackSVD for T where T: LapackGESVD + LapackGESDD {}
+impl<T> LapackRoutines for T where T: LapackGESVD + LapackGESDD {}

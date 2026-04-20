@@ -4,8 +4,10 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-use nalgebra::{ComplexField, RealField};
-use num_traits::{One, ToPrimitive, Zero};
+use num_complex::ComplexFloat;
+use num_traits::{Float, FromPrimitive, One, Zero};
+
+use crate::utils::lapack::LapackRoutines;
 
 pub trait FieldOps:
     Sized
@@ -13,6 +15,7 @@ pub trait FieldOps:
     + Sub<Output = Self>
     + Mul<Output = Self>
     + Div<Output = Self>
+    + Neg<Output = Self>
     + AddAssign
     + SubAssign
     + MulAssign
@@ -26,6 +29,7 @@ impl<T> FieldOps for T where
         + Sub<Output = Self>
         + Mul<Output = Self>
         + Div<Output = Self>
+        + Neg<Output = Self>
         + AddAssign
         + SubAssign
         + MulAssign
@@ -37,18 +41,20 @@ pub trait Field: Zero + One + FieldOps + Clone {}
 
 impl<T> Field for T where T: Zero + One + FieldOps + Clone {}
 
-pub trait RCLike: Field + ComplexField + Copy + Sum {
-    fn sqrt(&self) -> Self {
-        self.try_sqrt().expect("Sqrt error")
-    }
+pub trait RCLike:
+    Field + ComplexFloat + FromPrimitive + Copy + Sum + Debug + LapackRoutines
+{
 }
 
-impl<T> RCLike for T where T: Field + ComplexField + Copy + Sum {}
+impl<T> RCLike for T where
+    T: Field + ComplexFloat + FromPrimitive + Copy + Sum + Debug + LapackRoutines
+{
+}
 
-pub trait Real: Field + RealField + ToPrimitive + Copy + Sum {
+pub trait Real: Field + Float + FromPrimitive + Copy + Sum + Debug {
     /// Return 0.5.
     fn half() -> Self {
-        Self::from_f64(0.5).unwrap()
+        Self::from(0.5).unwrap()
     }
 
     fn addi(self, rhs: i32) -> Self {
@@ -65,7 +71,7 @@ pub trait Real: Field + RealField + ToPrimitive + Copy + Sum {
     }
 }
 
-impl<T> Real for T where T: Field + RealField + ToPrimitive + Copy + Sum {}
+impl<T> Real for T where T: Field + Float + FromPrimitive + Copy + Sum + Debug {}
 
 /// Algebraic vector operations used by manifold tangent vectors.
 pub trait Vector:

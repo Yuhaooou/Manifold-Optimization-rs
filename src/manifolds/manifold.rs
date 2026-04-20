@@ -1,4 +1,4 @@
-use nalgebra::ComplexField;
+use num_complex::ComplexFloat;
 use rand::{Rng, distr::Distribution};
 
 use crate::utils::traits::{RCLike, Vector};

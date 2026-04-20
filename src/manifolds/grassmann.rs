@@ -1,21 +1,21 @@
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::{Lapack, Scalar};
+use ndarray_linalg::Lapack;
 use ndarray_rand::RandomExt;
+use num_complex::ComplexFloat;
 use rand::Rng;
 use rand_distr::{Distribution, StandardNormal};
 
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Exp, Manifold, RandomPoint};
 use crate::random_point_forward;
-use crate::utils::{
-    tools::tsvd,
-    traits::{InnerProduct, Real},
-};
+use crate::utils::svd::{SVDBackend, thin_svd_owned, thin_svd_ref};
+use crate::utils::traits::InnerProduct;
+use crate::utils::traits::RCLike;
 
 #[derive(Debug, Clone)]
 /// Grassmann manifold `Gr(n, p)` of `p`-dimensional subspaces in `R^n`.
 pub struct Grassmann<D>
 where
-    D: Real + ScalarOperand,
+    D: RCLike,
 {
     pub name: String,
     n: usize,
@@ -25,7 +25,7 @@ where
 
 impl<D> Grassmann<D>
 where
-    D: Real + ScalarOperand,
+    D: RCLike,
 {
     /// Create `Gr(n, p)` with `n >= p >= 1`.
     pub fn new(n: usize, p: usize) -> Self {
@@ -46,7 +46,7 @@ where
 
 impl<D> Manifold for Grassmann<D>
 where
-    D: ScalarOperand + Real + Lapack<Real = D>,
+    D: RCLike + ScalarOperand + Lapack,
 {
     type Point = Array2<D>;
     type TangentVector = Array2<D>;
@@ -75,14 +75,14 @@ where
     }
 
     fn retraction(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
-        let (u, _, vt) = tsvd(&(point + tangent_vector)).unwrap();
+        let (u, _, vt) = thin_svd_owned(point + tangent_vector, SVDBackend::GESDD, None);
         u.dot(&vt)
     }
 }
 
 impl<D> EGradToRGrad for Grassmann<D>
 where
-    D: ScalarOperand + Real + Lapack<Real = D>,
+    D: RCLike + ScalarOperand + Lapack,
 {
     fn egrad_to_rgrad(
         &self,
@@ -95,7 +95,7 @@ where
 
 impl<D> EHessToRHess for Grassmann<D>
 where
-    D: ScalarOperand + Real + Lapack<Real = D>,
+    D: RCLike + ScalarOperand + Lapack,
 {
     fn ehess_to_rhess(
         &self,
@@ -112,7 +112,7 @@ where
 
 impl<D> RandomPoint for Grassmann<D>
 where
-    D: ScalarOperand + Real + Lapack<Real = D>,
+    D: RCLike + ScalarOperand + Lapack,
     StandardNormal: Distribution<D>,
 {
     random_point_forward!(StandardNormal);
@@ -122,26 +122,21 @@ where
         Dist: Distribution<Self::Field>,
         R: Rng + ?Sized,
     {
-        loop {
-            let point = Array2::random_using((self.n, self.p), &dist, rng);
-            match tsvd(&point) {
-                Ok((u, _, vt)) => return u.dot(&vt),
-                _ => println!(
-                    "Warning: get random point failed due to SVD decomposition failure. Retrying..."
-                ),
-            }
-        }
+        let point = Array2::random_using((self.n, self.p), &dist, rng);
+        let (u, _, vt) = thin_svd_owned(point, SVDBackend::GESDD, None);
+        u.dot(&vt)
     }
 }
 
 impl<D> Exp for Grassmann<D>
 where
-    D: ScalarOperand + Real + Lapack<Real = D>,
+    D: RCLike + ScalarOperand + Lapack,
 {
     fn exp(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
-        let (u, s, vt) = tsvd(&tangent_vector).unwrap();
-        let cos_s = Array::from_diag(&s.mapv(Scalar::cos));
-        let sin_s = Array::from_diag(&s.mapv(Scalar::sin));
+        let (u, s, vt) = thin_svd_ref(tangent_vector, SVDBackend::GESDD, None);
+        let s = s.map(|x| D::from(*x).unwrap());
+        let cos_s = Array::from_diag(&s.mapv(<D as ComplexFloat>::cos));
+        let sin_s = Array::from_diag(&s.mapv(<D as ComplexFloat>::sin));
         point.dot(&vt.t().dot(&cos_s).dot(&vt)) + u.dot(&sin_s).dot(&vt)
     }
 }

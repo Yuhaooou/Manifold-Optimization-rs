@@ -2,10 +2,10 @@ use core::fmt;
 use std::error::Error;
 
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::{Lapack, QR, SVD};
+use ndarray_linalg::{Lapack, QR};
 use num_traits::Float;
 
-use crate::utils::traits::Real;
+use crate::utils::traits::RCLike;
 
 /// Utility errors used by numerical helpers.
 #[derive(Debug)]
@@ -31,7 +31,7 @@ impl Error for Errors {}
 /// Panics if `mat` is not square.
 pub fn mat_sym<D>(mat: &Array2<D>) -> Array2<D>
 where
-    D: Real + ScalarOperand,
+    D: RCLike + ScalarOperand,
 {
     assert!(
         mat.shape()[0] == mat.shape()[1],
@@ -46,7 +46,7 @@ where
 /// Panics if `mat` is not square.
 pub fn mat_skew<D>(mat: &Array2<D>) -> Array2<D>
 where
-    D: Real + ScalarOperand,
+    D: RCLike + ScalarOperand,
 {
     assert!(
         mat.shape()[0] == mat.shape()[1],
@@ -61,7 +61,6 @@ where
 pub fn qr<D>(mat: &Array2<D>) -> Result<Array2<D>, Errors>
 where
     D: Lapack,
-    D::Real: Float,
 {
     if let Ok((q, r)) = mat.qr() {
         let sign = r.diag().mapv(|x| D::from_real(x.re().signum()));
@@ -71,22 +70,3 @@ where
     }
 }
 
-/// Truncated SVD helper.
-///
-/// Because ndarray-linalg does not expose a dedicated truncated SVD API,
-/// this function computes full SVD and slices the leading `r` components.
-pub fn tsvd<D>(mat: &Array2<D>) -> Result<(Array2<D>, Array1<D>, Array2<D>), Errors>
-where
-    D: Lapack<Real = D>,
-{
-    let r = mat.shape()[0].min(mat.shape()[1]);
-    // TODO: directly use *gesvd to get truncated SVD.
-    if let Ok((Some(u), s, Some(vt))) = mat.svd(true, true) {
-        let u_truncated = u.slice(s![.., ..r]).to_owned();
-        let s_truncated = s.slice(s![..r]).to_owned();
-        let vt_truncated = vt.slice(s![..r, ..]).to_owned();
-        Ok((u_truncated, s_truncated, vt_truncated))
-    } else {
-        Err(Errors::ComputeError("Truncated SVD".to_string()))
-    }
-}

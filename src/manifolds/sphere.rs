@@ -1,4 +1,5 @@
 use ndarray::{ScalarOperand, prelude::*};
+use ndarray_linalg::Lapack;
 use ndarray_rand::RandomExt;
 use rand::{
     Rng,
@@ -8,7 +9,7 @@ use rand::{
     },
 };
 
-use crate::{manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint}, random_point_forward};
+use crate::{manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint}, random_point_forward, utils::lapack::LapackRoutines};
 use crate::utils::traits::{InnerProduct, Norm, RCLike, Real};
 
 #[derive(Debug, Clone)]
@@ -43,7 +44,7 @@ where
 
 impl<D> Manifold for Sphere<D>
 where
-    D: Real + ScalarOperand,
+    D: RCLike + ScalarOperand,
 {
     type Field = D;
     type Point = Array1<D>;
@@ -61,7 +62,7 @@ where
     }
 
     fn to_manifold(&self, ambient: &Self::AmbientPoint) -> Self::Point {
-        let norm = D::from_real(ambient.norm());
+        let norm = ambient.norm();
         if norm == D::zero() {
             println!("Warning: ambient point is zero vector, returning base point on the sphere");
             self.base_point()
@@ -91,7 +92,7 @@ where
 
 impl<D> EGradToRGrad for Sphere<D>
 where
-    D: Real + ScalarOperand,
+    D: RCLike + ScalarOperand,
 {
     fn egrad_to_rgrad(&self, point: &Array1<D>, egrad: &Array1<D>) -> Array1<D> {
         self.projection(point, egrad)
@@ -100,7 +101,7 @@ where
 
 impl<D> EHessToRHess for Sphere<D>
 where
-    D: Real + ScalarOperand,
+    D: RCLike + ScalarOperand,
 {
     fn ehess_to_rhess(
         &self,
@@ -115,7 +116,7 @@ where
 
 impl<D> RandomPoint for Sphere<D>
 where
-    D: Real + ScalarOperand + SampleUniform,
+    D: Real + ScalarOperand + SampleUniform + Lapack<Real = D> + LapackRoutines,
 {
     random_point_forward!(Uniform::new(-D::one(), D::one()).unwrap());
 
