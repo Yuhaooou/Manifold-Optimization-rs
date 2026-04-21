@@ -127,7 +127,7 @@ where
                 &current_point,
                 current_value,
                 &-grad,
-                grad_norm.powi(2),
+                grad_norm.powi_(2),
                 &self.back_tracking_params,
             );
 

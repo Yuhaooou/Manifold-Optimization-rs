@@ -1,5 +1,4 @@
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::Lapack;
 use ndarray_rand::RandomExt;
 use rand::{
     Rng,
@@ -9,8 +8,11 @@ use rand::{
     },
 };
 
-use crate::{manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint}, random_point_forward, utils::lapack::LapackRoutines};
 use crate::utils::traits::{InnerProduct, Norm, RCLike, Real};
+use crate::{
+    manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint},
+    random_point_forward,
+};
 
 #[derive(Debug, Clone)]
 /// Sphere manifold $S^{n-1}$ embedded in Euclidean space.
@@ -76,7 +78,7 @@ where
         _point: &Self::Point,
         tangent_vector1: &Self::TangentVector,
         tangent_vector2: &Self::TangentVector,
-    ) -> D {
+    ) -> D::Real {
         tangent_vector1.inner(tangent_vector2)
     }
 
@@ -116,7 +118,7 @@ where
 
 impl<D> RandomPoint for Sphere<D>
 where
-    D: Real + ScalarOperand + SampleUniform + Lapack<Real = D> + LapackRoutines,
+    D: Real + ScalarOperand + SampleUniform,
 {
     random_point_forward!(Uniform::new(-D::one(), D::one()).unwrap());
 

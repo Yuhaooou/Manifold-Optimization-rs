@@ -1,13 +1,7 @@
-use std::{
-    fmt::Debug,
-    iter::Sum,
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
-};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
-use num_complex::ComplexFloat;
+use num_complex::{Complex32 as c32, Complex64 as c64, ComplexFloat};
 use num_traits::{Float, FromPrimitive, One, Zero};
-
-use crate::utils::lapack::LapackRoutines;
 
 pub trait FieldOps:
     Sized
@@ -41,17 +35,21 @@ pub trait Field: Zero + One + FieldOps + Clone {}
 
 impl<T> Field for T where T: Zero + One + FieldOps + Clone {}
 
-pub trait RCLike:
-    Field + ComplexFloat + FromPrimitive + Copy + Sum + Debug + LapackRoutines
-{
+pub trait RCLike: Field + ImaginaryUnit + ComplexFloat + FromPrimitive + 'static + IsReal {
+    fn from_real(real: Self::Real) -> Self {
+        Self::from(real).unwrap()
+    }
+
+    /// For real types, return self. For complex types, return self multiplied by i.
+    fn try_from_real_to_imag(real: Self::Real) -> Self {
+        Self::from_real(real).mul_i_or_one()
+    }
 }
 
-impl<T> RCLike for T where
-    T: Field + ComplexFloat + FromPrimitive + Copy + Sum + Debug + LapackRoutines
-{
-}
+impl<T> RCLike for T where T: Field + ImaginaryUnit + ComplexFloat + FromPrimitive + 'static + IsReal
+{}
 
-pub trait Real: Field + Float + FromPrimitive + Copy + Sum + Debug {
+pub trait Real: RCLike<Real = Self> + Float {
     /// Return 0.5.
     fn half() -> Self {
         Self::from(0.5).unwrap()
@@ -69,9 +67,93 @@ pub trait Real: Field + Float + FromPrimitive + Copy + Sum + Debug {
     fn divi(self, rhs: i32) -> Self {
         self / Self::from_i32(rhs).unwrap()
     }
+
+    fn sqrt_(self) -> Self {
+        Float::sqrt(self)
+    }
+
+    fn abs_(self) -> Self {
+        Float::abs(self)
+    }
+
+    fn powi_(self, exp: i32) -> Self {
+        Float::powi(self, exp)
+    }
+
+    fn powf_(self, exp: Self) -> Self {
+        Float::powf(self, exp)
+    }
 }
 
-impl<T> Real for T where T: Field + Float + FromPrimitive + Copy + Sum + Debug {}
+impl<T> Real for T where T: RCLike<Real = Self> + Float {}
+
+pub trait ImaginaryUnit {
+    /// Return 0 for real types and i for complex types.
+    fn get_i_or_zero() -> Self;
+
+    /// Multiply self by i if it is complex, otherwise return self.
+    fn mul_i_or_one(self) -> Self;
+}
+
+impl ImaginaryUnit for c64 {
+    fn get_i_or_zero() -> Self {
+        c64::new(0.0, 1.0)
+    }
+
+    fn mul_i_or_one(self) -> Self {
+        self * c64::new(0.0, 1.0)
+    }
+}
+
+impl ImaginaryUnit for c32 {
+    fn get_i_or_zero() -> Self {
+        c32::new(0.0, 1.0)
+    }
+
+    fn mul_i_or_one(self) -> Self {
+        self * c32::new(0.0, 1.0)
+    }
+}
+
+impl ImaginaryUnit for f64 {
+    fn get_i_or_zero() -> Self {
+        0.0
+    }
+
+    fn mul_i_or_one(self) -> Self {
+        self
+    }
+}
+
+impl ImaginaryUnit for f32 {
+    fn get_i_or_zero() -> Self {
+        0.0
+    }
+
+    fn mul_i_or_one(self) -> Self {
+        self
+    }
+}
+
+pub trait IsReal {
+    const IS_REAL: bool;
+}
+
+impl IsReal for c64 {
+    const IS_REAL: bool = false;
+}
+
+impl IsReal for c32 {
+    const IS_REAL: bool = false;
+}
+
+impl IsReal for f64 {
+    const IS_REAL: bool = true;
+}
+
+impl IsReal for f32 {
+    const IS_REAL: bool = true;
+}
 
 /// Algebraic vector operations used by manifold tangent vectors.
 pub trait Vector:
@@ -83,7 +165,6 @@ pub trait Vector:
     + Mul<Self::Field, Output = Self>
     + Div<Self::Field, Output = Self>
     + Neg<Output = Self>
-    + Debug
 {
     type Field: RCLike;
 
@@ -166,7 +247,7 @@ pub trait InnerProduct {
     type Field: RCLike;
 
     /// Inner product with `rhs`.
-    fn inner(&self, rhs: &Self) -> Self::Field;
+    fn inner(&self, rhs: &Self) -> <Self::Field as ComplexFloat>::Real;
 }
 
 /// Convenience alias: a normed vector with inner product.

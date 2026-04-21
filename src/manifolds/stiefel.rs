@@ -1,16 +1,16 @@
 use ndarray::{ScalarOperand, prelude::*};
-use ndarray_linalg::Lapack;
 use ndarray_rand::RandomExt;
 use rand::Rng;
 use rand_distr::{Distribution, StandardNormal};
 
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint};
 use crate::random_point_forward;
-use crate::utils::lapack::LapackRoutines;
-use crate::utils::svd::{SVDBackend, thin_svd_owned};
+use crate::utils::Linalg;
+use crate::utils::qr::LinalgQR;
+use crate::utils::svd::{LinalgSVD, SVDBackend};
 use crate::utils::{
-    tools::{mat_sym, qr},
-    traits::{InnerProduct, RCLike, Real},
+    tools::mat_sym,
+    traits::{InnerProduct, RCLike},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,13 +35,13 @@ where
 
 impl<D> Stiefel<D>
 where
-    D: RCLike + Lapack + LapackRoutines,
+    D: RCLike,
 {
     /// Create `St(n, p)` with default QR retraction.
     pub fn new(n: usize, p: usize) -> Self {
         assert!(n >= p && p >= 1, "Need n >= p >= 1");
         Stiefel {
-            name: format!("Stiefel manifold St({},{})", n, p),
+            name: format!("Complex Stiefel manifold St({},{})", n, p),
             n,
             p,
             retraction_type: StRetrType::QR,
@@ -67,16 +67,16 @@ where
 
     fn retraction_qr(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D>
     where
-        D: Lapack,
+        Array2<D>: LinalgQR<Elem = D>,
     {
-        qr(&(point + tangent_vector)).unwrap()
+        (point + tangent_vector).qr_().0
     }
 
     fn retraction_polar(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D>
     where
-        D: LapackRoutines,
+        Array2<D>: LinalgSVD<Elem = D>,
     {
-        let (u, _, vt) = thin_svd_owned(point + tangent_vector, SVDBackend::GESDD, None);
+        let (u, _, vt) = (point + tangent_vector).thin_svd_owned(SVDBackend::GESDD, None);
         u.dot(&vt)
     }
 
@@ -88,7 +88,8 @@ where
 
 impl<D> Manifold for Stiefel<D>
 where
-    D: RCLike + ScalarOperand + Lapack + LapackRoutines,
+    D: RCLike + ScalarOperand,
+    Array2<D>: Linalg<Elem = D>,
 {
     type Point = Array2<D>;
     type TangentVector = Array2<D>;
@@ -112,7 +113,7 @@ where
         _point: &Self::Point,
         tangent_vector1: &Array2<D>,
         tangent_vector2: &Array2<D>,
-    ) -> D {
+    ) -> D::Real {
         tangent_vector1.inner(tangent_vector2)
     }
 
@@ -122,7 +123,7 @@ where
         tmp1 + point.dot(&tmp2) / D::from_i8(2).unwrap()
     }
 
-    fn retraction(&self, point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
+    fn retraction(&self, point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> where {
         match self.retraction_type {
             StRetrType::QR => Self::retraction_qr(point, tangent_vector),
             StRetrType::Polar => Self::retraction_polar(point, tangent_vector),
@@ -132,7 +133,8 @@ where
 
 impl<D> EGradToRGrad for Stiefel<D>
 where
-    D: RCLike + ScalarOperand + Lapack + LapackRoutines,
+    D: RCLike + ScalarOperand,
+    Array2<D>: Linalg<Elem = D>,
 {
     fn egrad_to_rgrad(&self, point: &Array2<D>, egrad: &Array2<D>) -> Array2<D> {
         egrad - point.dot(&mat_sym(&point.t().dot(egrad)))
@@ -141,7 +143,8 @@ where
 
 impl<D> EHessToRHess for Stiefel<D>
 where
-    D: RCLike + ScalarOperand + Lapack + LapackRoutines,
+    D: RCLike + ScalarOperand,
+    Array2<D>: Linalg<Elem = D>,
 {
     fn ehess_to_rhess(
         &self,
@@ -158,25 +161,24 @@ where
 // Q: Is standard normal randomly enough after QR?
 impl<D> RandomPoint for Stiefel<D>
 where
-    D: Real + ScalarOperand + Lapack<Real = D> + LapackRoutines,
-    StandardNormal: Distribution<D>,
+    D: RCLike + ScalarOperand,
+    ArrayBase<ndarray::OwnedRepr<D>, Ix2, D>: Linalg<Elem = D>, // Why?
+    StandardNormal: Distribution<D::Real>,
 {
     random_point_forward!(StandardNormal);
 
     fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
     where
-        Dist: Distribution<Self::Field>,
+        Dist: Distribution<D::Real>,
         R: Rng + ?Sized,
     {
-        loop {
-            let point = Array2::random_using((self.n, self.p), &dist, rng);
-            match qr(&point) {
-                Ok(q) => return q,
-                Err(_) => println!(
-                    "Warning: get random point failed due to QR decomposition failure. Retrying..."
-                ),
-            }
+        let point_real = Array2::random_using((self.n, self.p), &dist, rng).mapv(D::from_real);
+        if D::IS_REAL {
+            return point_real.qr_().0;
         }
+        let point_imag =
+            Array2::random_using((self.n, self.p), &dist, rng).mapv(D::try_from_real_to_imag);
+        (point_real + point_imag).qr_().0
     }
 }
 

@@ -153,20 +153,20 @@ where
         };
 
         let b_norm = self.problem.norm(point, b);
-        let r_bound = b_norm * R::min(self.kappa, b_norm.powf(self.theta));
+        let r_bound = b_norm * R::min(self.kappa, b_norm.powf_(self.theta));
 
         for iter in 1..=self.max_inner_iterations {
             let hp = self.problem.hessian(point, &p);
             let p_hp = self.problem.inner(point, &p, &hp);
-            let alpha = self.problem.norm(point, &r).powi(2) / p_hp;
+            let alpha = self.problem.norm(point, &r).powi_(2) / p_hp;
             let v_next = v.ref_add(p.ref_mul_num(alpha));
 
             if p_hp <= R::zero() || self.problem.norm(point, &v_next) >= radius {
                 let inner_v_p = self.problem.inner(point, &v, &p);
-                let norm_p_sq = self.problem.norm(point, &p).powi(2);
-                let norm_v_sq = self.problem.norm(point, &v).powi(2);
-                let tmp = norm_p_sq * (norm_v_sq - radius.powi(2)).muli(4);
-                let t = (-inner_v_p + (inner_v_p.powi(2) - tmp).sqrt()) / norm_p_sq;
+                let norm_p_sq = self.problem.norm(point, &p).powi_(2);
+                let norm_v_sq = self.problem.norm(point, &v).powi_(2);
+                let tmp = norm_p_sq * (norm_v_sq - radius.powi_(2)).muli(4);
+                let t = (-inner_v_p + (inner_v_p.powi_(2) - tmp).sqrt_()) / norm_p_sq;
 
                 v = v + p * t;
                 let subproblem_value = subproblem_func(&v);
@@ -180,7 +180,7 @@ where
             }
 
             let beta =
-                self.problem.norm(point, &r_next).powi(2) / self.problem.norm(point, &r).powi(2);
+                self.problem.norm(point, &r_next).powi_(2) / self.problem.norm(point, &r).powi_(2);
             p = r_next.ref_add(p * beta);
             r = r_next;
         }
@@ -245,7 +245,7 @@ where
             if rho < R::from_f64(0.25).unwrap() {
                 radius = radius * R::from_f64(0.25).unwrap();
             } else if rho > R::from_f64(0.75).unwrap()
-                || (self.problem.norm(&current_point, &step) - radius).abs() == R::zero()
+                || (self.problem.norm(&current_point, &step) - radius).abs_() == R::zero()
             {
                 radius = R::min(radius.muli(2), self.max_radius);
             }

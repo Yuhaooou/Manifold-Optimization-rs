@@ -76,7 +76,7 @@ where
     type Field = K;
 
     fn norm(&self) -> K {
-        self.iter().map(|x| x.powi(2)).sum::<K>().sqrt()
+        self.iter().map(|x| x.powi(2)).reduce(K::add).unwrap_or(K::zero()).sqrt()
     }
 }
 
@@ -88,11 +88,11 @@ where
     type Field = K;
 
     // Need optimization.
-    fn inner(&self, rhs: &Array<K, IxN>) -> K {
+    fn inner(&self, rhs: &Array<K, IxN>) -> K::Real {
         assert!(
             self.shape() == rhs.shape(),
             "Inner product requires the same shape"
         );
-        (self * rhs.mapv(K::conj)).sum()
+        (self * rhs.mapv(K::conj)).sum().re()
     }
 }

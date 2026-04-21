@@ -1,3 +1,5 @@
+use num_complex::ComplexFloat;
+
 use crate::manifolds::manifold::*;
 
 #[derive(Debug, Clone)]
@@ -96,12 +98,17 @@ where
     }
 
     /// Norm induced by manifold metric.
-    pub fn norm(&self, x: &M::Point, v: &M::TangentVector) -> M::Field {
+    pub fn norm(&self, x: &M::Point, v: &M::TangentVector) -> <M::Field as ComplexFloat>::Real {
         self.manifold.norm(x, v)
     }
 
     /// Manifold inner product of tangent vectors.
-    pub fn inner(&self, x: &M::Point, v1: &M::TangentVector, v2: &M::TangentVector) -> M::Field {
+    pub fn inner(
+        &self,
+        x: &M::Point,
+        v1: &M::TangentVector,
+        v2: &M::TangentVector,
+    ) -> <M::Field as ComplexFloat>::Real {
         self.manifold.inner(x, v1, v2)
     }
 

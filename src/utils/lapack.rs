@@ -1,10 +1,9 @@
 use std::{ffi::c_char, fmt::Debug, ptr::null_mut};
 
 use lapack_sys::*;
-use num_complex::{Complex, Complex32 as c32, Complex64 as c64, ComplexFloat};
-use num_traits::Zero;
+use num_complex::{Complex, Complex32 as c32, Complex64 as c64};
 
-use crate::utils::lapack;
+use crate::utils::{lapack, traits::RCLike};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LapackChar {
@@ -50,63 +49,6 @@ impl LapackChar {
     }
 }
 
-pub trait LapackElem: ComplexFloat + 'static + Debug {
-    const IS_REAL: bool;
-
-    fn from_real(r: Self::Real) -> Self;
-
-    /// For real types, return 0. For complex types, get the imaginary unit.
-    fn get_i() -> Self;
-}
-
-impl LapackElem for f64 {
-    const IS_REAL: bool = true;
-
-    fn from_real(r: Self::Real) -> Self {
-        r
-    }
-
-    fn get_i() -> Self {
-        Self::zero()
-    }
-}
-
-impl LapackElem for f32 {
-    const IS_REAL: bool = true;
-
-    fn from_real(r: Self::Real) -> Self {
-        r
-    }
-
-    fn get_i() -> Self {
-        Self::zero()
-    }
-}
-
-impl LapackElem for c64 {
-    const IS_REAL: bool = false;
-
-    fn from_real(r: Self::Real) -> Self {
-        Complex::new(r, 0.)
-    }
-
-    fn get_i() -> Self {
-        Complex::new(0., 1.)
-    }
-}
-
-impl LapackElem for c32 {
-    const IS_REAL: bool = false;
-
-    fn from_real(r: Self::Real) -> Self {
-        Complex::new(r, 0.)
-    }
-
-    fn get_i() -> Self {
-        Complex::new(0., 1.)
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Layout {
     C,
@@ -137,7 +79,7 @@ pub(crate) fn new_uninit_vec<T>(len: usize) -> Vec<T> {
     vec
 }
 
-pub trait LapackGESVD: LapackElem {
+pub(crate) trait LapackGESVD: RCLike {
     fn gesvd(
         jobu: LapackChar,
         jobvt: LapackChar,
@@ -249,7 +191,7 @@ macro_rules! lapack_gesvd_c {
 lapack_gesvd_c!(f64, lapack::zgesvd_);
 lapack_gesvd_c!(f32, lapack::cgesvd_);
 
-pub trait LapackGESDD: LapackElem {
+pub(crate) trait LapackGESDD: RCLike {
     fn gesdd(
         jobz: LapackChar,
         m: i32,
@@ -362,6 +304,57 @@ macro_rules! lapack_gesdd_c {
 lapack_gesdd_c!(f64, lapack::zgesdd_);
 lapack_gesdd_c!(f32, lapack::cgesdd_);
 
-pub trait LapackRoutines: LapackGESVD + LapackGESDD {}
+pub trait GEQR: RCLike {
+    fn geqr(
+        m: i32,
+        n: i32,
+        mat: *mut Self,
+        lda: i32,
+        t: *mut Self,
+        tsize: i32,
+        work: *mut Self,
+        lwork: i32,
+    ) -> i32;
+}
 
-impl<T> LapackRoutines for T where T: LapackGESVD + LapackGESDD {}
+macro_rules! lapack_geqr {
+    ($t:ty, $tt:ty, $fun:expr) => {
+        impl GEQR for $t {
+            fn geqr(
+                m: i32,
+                n: i32,
+                mat: *mut Self,
+                lda: i32,
+                t: *mut Self,
+                tsize: i32,
+                work: *mut Self,
+                lwork: i32,
+            ) -> i32 {
+                let mut info = 0;
+                unsafe {
+                    $fun(
+                        &m,
+                        &n,
+                        mat as *mut $tt,
+                        &lda,
+                        t as *mut $tt,
+                        &tsize,
+                        work as *mut $tt,
+                        &lwork,
+                        &mut info,
+                    );
+                    info
+                }
+            }
+        }
+    };
+}
+
+lapack_geqr!(f64, f64, lapack::dgeqr_);
+lapack_geqr!(f32, f32, lapack::sgeqr_);
+lapack_geqr!(c64, __BindgenComplex<f64>, lapack::zgeqr_);
+lapack_geqr!(c32, __BindgenComplex<f32>, lapack::cgeqr_);
+
+pub(crate) trait LapackElem: RCLike + LapackGESVD + LapackGESDD + GEQR {}
+
+impl<T> LapackElem for T where T: LapackGESVD + LapackGESDD + GEQR {}

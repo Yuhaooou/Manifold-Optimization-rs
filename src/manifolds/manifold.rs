@@ -37,10 +37,14 @@ pub trait Manifold: Clone {
         point: &Self::Point,
         tangent_vector1: &Self::TangentVector,
         tangent_vector2: &Self::TangentVector,
-    ) -> Self::Field;
+    ) -> <Self::Field as ComplexFloat>::Real;
 
     /// Norm induced by [`Self::inner`].
-    fn norm(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Field {
+    fn norm(
+        &self,
+        point: &Self::Point,
+        tangent_vector: &Self::TangentVector,
+    ) -> <Self::Field as ComplexFloat>::Real {
         self.inner(point, tangent_vector, tangent_vector).sqrt()
     }
 
@@ -103,11 +107,11 @@ pub trait RandomPoint: Manifold {
 
     fn random_point_with_dist<Dist>(&self, dist: Dist) -> Self::Point
     where
-        Dist: Distribution<Self::Field>;
+        Dist: Distribution<<Self::Field as ComplexFloat>::Real>;
 
     fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
     where
-        Dist: Distribution<Self::Field>,
+        Dist: Distribution<<Self::Field as ComplexFloat>::Real>,
         R: Rng + ?Sized;
 }
 
@@ -127,7 +131,7 @@ macro_rules! random_point_forward {
 
         fn random_point_with_dist<Dist>(&self, dist: Dist) -> Self::Point
         where
-            Dist: Distribution<D>,
+            Dist: Distribution<D::Real>,
         {
             self.random_point_impl(dist, &mut rand::rng())
         }

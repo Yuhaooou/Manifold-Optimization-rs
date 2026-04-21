@@ -1,9 +1,10 @@
 use std::fmt::Display;
 
 use ndarray::prelude::*;
+use num_complex::{Complex32 as c32, Complex64 as c64, ComplexFloat};
 use num_traits::Float;
 
-use crate::utils::lapack::*;
+use crate::utils::{LinalgBase, lapack::*};
 
 pub mod unused {
     use super::*;
@@ -134,11 +135,14 @@ impl SVDBackend {
 }
 
 /// Thin Svd for F-order matrixm. This funtion will destroy the input matrix.
-fn thin_svd_owned_impl<T: LapackRoutines>(
+fn thin_svd_owned_impl<T>(
     mut mat: Array2<T>,
     order: Layout,
     backend: SVDBackend,
-) -> (Array2<T>, Array1<T::Real>, Array2<T>) {
+) -> (Array2<T>, Array1<T::Real>, Array2<T>)
+where
+    T: LapackElem,
+{
     // For f-order mat, directly use lapack routines to compute. For c-order mat, we compute mat.t(), so m and n are reversed.
     let (m, n) = if order.is_f() {
         mat.dim()
@@ -292,11 +296,14 @@ fn thin_svd_owned_impl<T: LapackRoutines>(
 }
 
 /// Thin svd for owned matrix. This funtion will destroy the input matrix.
-pub fn thin_svd_owned<T: LapackRoutines>(
+fn thin_svd_owned<T>(
     mat: Array2<T>,
     backend: SVDBackend,
     order: Option<Layout>,
-) -> (Array2<T>, Array1<T::Real>, Array2<T>) {
+) -> (Array2<T>, Array1<T::Real>, Array2<T>)
+where
+    T: LapackElem,
+{
     if order.is_some() {
         thin_svd_owned_impl(mat, order.unwrap(), backend)
     } else if mat.t().is_standard_layout() {
@@ -314,28 +321,77 @@ pub fn thin_svd_owned<T: LapackRoutines>(
                 .map(T::abs)
                 .reduce(T::Real::max)
                 .unwrap_or(T::zero().re())
-                < T::Real::epsilon().sqrt(),
+                < num_traits::Float::sqrt(T::Real::epsilon()),
             "SVD result does not reconstruct the original matrix well. This may be a bug."
         );
         (u, s, vt)
     }
 }
 
-pub fn thin_svd_ref<T: LapackRoutines>(
-    mat: &Array2<T>,
-    backend: SVDBackend,
-    order: Option<Layout>,
-) -> (Array2<T>, Array1<T::Real>, Array2<T>) {
-    thin_svd_owned(mat.to_owned(), backend, order)
+pub trait LinalgSVD: LinalgBase {
+    fn thin_svd_owned(
+        &self,
+        backend: SVDBackend,
+        order: Option<Layout>,
+    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>);
+
+    fn thin_svd_ref(
+        &self,
+        backend: SVDBackend,
+        order: Option<Layout>,
+    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>) {
+        self.to_owned().thin_svd_owned(backend, order)
+    }
+}
+
+impl LinalgSVD for Array2<f64> {
+    fn thin_svd_owned(
+        &self,
+        backend: SVDBackend,
+        order: Option<Layout>,
+    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>) {
+        thin_svd_owned(self.to_owned(), backend, order)
+    }
+}
+
+impl LinalgSVD for Array2<f32> {
+    fn thin_svd_owned(
+        &self,
+        backend: SVDBackend,
+        order: Option<Layout>,
+    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>) {
+        thin_svd_owned(self.to_owned(), backend, order)
+    }
+}
+
+impl LinalgSVD for Array2<c64> {
+    fn thin_svd_owned(
+        &self,
+        backend: SVDBackend,
+        order: Option<Layout>,
+    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>) {
+        thin_svd_owned(self.to_owned(), backend, order)
+    }
+}
+
+impl LinalgSVD for Array2<c32> {
+    fn thin_svd_owned(
+        &self,
+        backend: SVDBackend,
+        order: Option<Layout>,
+    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>) {
+        thin_svd_owned(self.to_owned(), backend, order)
+    }
 }
 
 #[cfg(test)]
 mod test {
     #![allow(dead_code, unused)]
     use ndarray_rand::RandomExt;
-    use num_complex::{Complex32 as c32, Complex64 as c64};
     use paste::item;
     use rand_distr::{Uniform, uniform::SampleUniform};
+
+    use crate::utils::{Linalg, traits::RCLike};
 
     use super::{Layout::*, SVDBackend::*, *};
 
@@ -346,9 +402,10 @@ mod test {
 
     fn test_svd_inner<T>(mat: Array2<T>, backend: SVDBackend, order: Layout, eps: T::Real)
     where
-        T: LapackRoutines,
+        T: RCLike,
+        Array2<T>: Linalg<Elem = T>,
     {
-        let (u, s, vt) = thin_svd_owned(mat.clone(), backend, Some(order));
+        let (u, s, vt) = mat.clone().thin_svd_owned(backend, Some(order));
         let s = s.mapv(T::from_real);
         let a_re = u.dot(&Array2::from_diag(&s)).dot(&vt);
         let err = (a_re - mat)
@@ -361,7 +418,8 @@ mod test {
 
     fn test_svd<T>(m: usize, n: usize, order: Layout, backend: SVDBackend, eps: T::Real)
     where
-        T: LapackRoutines,
+        T: RCLike,
+        Array2<T>: Linalg<Elem = T>,
         T::Real: SampleUniform,
     {
         let sh = match order {
@@ -370,7 +428,7 @@ mod test {
         };
         let a = Array::random(sh, Uniform::new(T::zero().re(), T::one().re()).unwrap());
         let b = Array::random(sh, Uniform::new(T::zero().re(), T::one().re()).unwrap());
-        let c = a.mapv(T::from_real) + b.mapv(|x| T::from_real(x) * T::get_i());
+        let c = a.mapv(T::from_real) + b.mapv(|x| T::from_real(x).mul_i_or_one());
         test_svd_inner(c, backend, order, eps);
     }
 
