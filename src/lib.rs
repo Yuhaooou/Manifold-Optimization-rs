@@ -9,4 +9,5 @@
 pub mod algorithm;
 pub mod manifolds;
 pub mod problem;
+pub mod linalg;
 pub mod utils;

@@ -5,9 +5,7 @@ use rand_distr::{Distribution, StandardNormal};
 
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint};
 use crate::random_point_forward;
-use crate::utils::Linalg;
-use crate::utils::qr::LinalgQR;
-use crate::utils::svd::{LinalgSVD, SVDBackend};
+use crate::linalg::{LapackElem, LinalgQR, LinalgSVD};
 use crate::utils::{
     tools::mat_sym,
     traits::{InnerProduct, RCLike},
@@ -35,7 +33,7 @@ where
 
 impl<D> Stiefel<D>
 where
-    D: RCLike,
+    D: RCLike + LapackElem,
 {
     /// Create `St(n, p)` with default QR retraction.
     pub fn new(n: usize, p: usize) -> Self {
@@ -65,18 +63,12 @@ where
         self
     }
 
-    fn retraction_qr(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D>
-    where
-        Array2<D>: LinalgQR<Elem = D>,
-    {
+    fn retraction_qr(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
         (point + tangent_vector).qr_().0
     }
 
-    fn retraction_polar(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D>
-    where
-        Array2<D>: LinalgSVD<Elem = D>,
-    {
-        let (u, _, vt) = (point + tangent_vector).thin_svd_owned(SVDBackend::GESDD, None);
+    fn retraction_polar(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
+        let (u, _, vt) = (point + tangent_vector).svd_owned();
         u.dot(&vt)
     }
 
@@ -88,8 +80,7 @@ where
 
 impl<D> Manifold for Stiefel<D>
 where
-    D: RCLike + ScalarOperand,
-    Array2<D>: Linalg<Elem = D>,
+    D: RCLike + ScalarOperand + LapackElem,
 {
     type Point = Array2<D>;
     type TangentVector = Array2<D>;
@@ -133,8 +124,7 @@ where
 
 impl<D> EGradToRGrad for Stiefel<D>
 where
-    D: RCLike + ScalarOperand,
-    Array2<D>: Linalg<Elem = D>,
+    D: RCLike + ScalarOperand + LapackElem,
 {
     fn egrad_to_rgrad(&self, point: &Array2<D>, egrad: &Array2<D>) -> Array2<D> {
         egrad - point.dot(&mat_sym(&point.t().dot(egrad)))
@@ -143,8 +133,7 @@ where
 
 impl<D> EHessToRHess for Stiefel<D>
 where
-    D: RCLike + ScalarOperand,
-    Array2<D>: Linalg<Elem = D>,
+    D: RCLike + ScalarOperand + LapackElem,
 {
     fn ehess_to_rhess(
         &self,
@@ -161,8 +150,7 @@ where
 // Q: Is standard normal randomly enough after QR?
 impl<D> RandomPoint for Stiefel<D>
 where
-    D: RCLike + ScalarOperand,
-    ArrayBase<ndarray::OwnedRepr<D>, Ix2, D>: Linalg<Elem = D>, // Why?
+    D: RCLike + ScalarOperand + LapackElem,
     StandardNormal: Distribution<D::Real>,
 {
     random_point_forward!(StandardNormal);
@@ -184,8 +172,9 @@ where
 
 #[allow(unused_imports)]
 mod tests {
+    use crate::utils::traits::Norm;
+
     use super::*;
-    use ndarray_linalg::Norm;
     use rand::distr::Uniform;
 
     #[test]
@@ -196,7 +185,7 @@ mod tests {
         let manifold = Stiefel::<f64>::new(n, p);
 
         let point = manifold.random_point();
-        let err1 = (point.t().dot(&point) - Array2::<f64>::eye(p)).norm_l2();
+        let err1 = (point.t().dot(&point) - Array2::<f64>::eye(p)).norm();
         assert!(
             err1 < eps,
             "Point is not on the Stiefel manifold: error = {}",
@@ -206,7 +195,7 @@ mod tests {
         let ambient_point = Array2::random((n, p), Uniform::new(0., 1.).unwrap());
         let tangent_vector = manifold.projection(&point, &ambient_point);
         let xtv = point.t().dot(&tangent_vector);
-        let err2 = (&xtv + &xtv.t()).norm_l2();
+        let err2 = (&xtv + &xtv.t()).norm();
         assert!(
             err2 < eps,
             "Tangent vector is not in the tangent space: error = {}",
@@ -214,7 +203,7 @@ mod tests {
         );
 
         let retracted_point = manifold.retraction(&point, &(tangent_vector * 1.2));
-        let err3 = (retracted_point.t().dot(&retracted_point) - Array2::<f64>::eye(p)).norm_l2();
+        let err3 = (retracted_point.t().dot(&retracted_point) - Array2::<f64>::eye(p)).norm();
         assert!(
             err3 < eps,
             "Retracted point is not on the Stiefel manifold: error = {}",

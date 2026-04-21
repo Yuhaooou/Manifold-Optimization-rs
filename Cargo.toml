@@ -12,7 +12,7 @@ authors = [
 [dependencies]
 rand = "0.9.4"
 ndarray = { version = "0.17.2" }
-ndarray-linalg = { version = "0.18.1", features = ["openblas-system"] }
+# ndarray-linalg = { version = "0.18.1", features = ["openblas-system"] }
 ndarray-rand = "0.16.0"
 argmin = "0.11.0"
 num-traits = "0.2"

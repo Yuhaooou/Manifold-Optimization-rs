@@ -1,10 +1,9 @@
 use std::fmt::Display;
 
 use ndarray::prelude::*;
-use num_complex::{Complex32 as c32, Complex64 as c64, ComplexFloat};
 use num_traits::Float;
 
-use crate::utils::{LinalgBase, lapack::*};
+use super::lapack::*;
 
 pub mod unused {
     use super::*;
@@ -328,58 +327,63 @@ where
     }
 }
 
-pub trait LinalgSVD: LinalgBase {
-    fn thin_svd_owned(
+pub trait LinalgSVD {
+    type Elem;
+    type Real;
+
+    fn svd_owned(
+        self,
+    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
+
+    fn svd_ref(
         &self,
+    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
+
+    fn thin_svd_owned(
+        self,
         backend: SVDBackend,
         order: Option<Layout>,
-    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>);
+    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
 
     fn thin_svd_ref(
         &self,
         backend: SVDBackend,
         order: Option<Layout>,
-    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>) {
-        self.to_owned().thin_svd_owned(backend, order)
-    }
+    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
 }
 
-impl LinalgSVD for Array2<f64> {
+impl<T> LinalgSVD for Array2<T>
+where
+    T: LapackElem,
+{
+    type Elem = T;
+    type Real = T::Real;
+
+    fn svd_owned(
+            self,
+        ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
+        self.thin_svd_owned(SVDBackend::GESDD, None)
+    }
+
+    fn svd_ref(
+            &self,
+        ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
+        self.thin_svd_ref(SVDBackend::GESDD, None)
+    }
+
     fn thin_svd_owned(
+        self,
+        backend: SVDBackend,
+        order: Option<Layout>,
+    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
+        thin_svd_owned(self, backend, order)
+    }
+
+    fn thin_svd_ref(
         &self,
         backend: SVDBackend,
         order: Option<Layout>,
-    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>) {
-        thin_svd_owned(self.to_owned(), backend, order)
-    }
-}
-
-impl LinalgSVD for Array2<f32> {
-    fn thin_svd_owned(
-        &self,
-        backend: SVDBackend,
-        order: Option<Layout>,
-    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>) {
-        thin_svd_owned(self.to_owned(), backend, order)
-    }
-}
-
-impl LinalgSVD for Array2<c64> {
-    fn thin_svd_owned(
-        &self,
-        backend: SVDBackend,
-        order: Option<Layout>,
-    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>) {
-        thin_svd_owned(self.to_owned(), backend, order)
-    }
-}
-
-impl LinalgSVD for Array2<c32> {
-    fn thin_svd_owned(
-        &self,
-        backend: SVDBackend,
-        order: Option<Layout>,
-    ) -> (Array2<Self::Elem>, Array1<<Self::Elem as ComplexFloat>::Real>, Array2<Self::Elem>) {
+    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
         thin_svd_owned(self.to_owned(), backend, order)
     }
 }
@@ -388,10 +392,11 @@ impl LinalgSVD for Array2<c32> {
 mod test {
     #![allow(dead_code, unused)]
     use ndarray_rand::RandomExt;
+    use num_complex::{Complex32 as c32, Complex64 as c64};
     use paste::item;
     use rand_distr::{Uniform, uniform::SampleUniform};
 
-    use crate::utils::{Linalg, traits::RCLike};
+    use crate::utils::{traits::RCLike};
 
     use super::{Layout::*, SVDBackend::*, *};
 
@@ -402,8 +407,7 @@ mod test {
 
     fn test_svd_inner<T>(mat: Array2<T>, backend: SVDBackend, order: Layout, eps: T::Real)
     where
-        T: RCLike,
-        Array2<T>: Linalg<Elem = T>,
+        T: RCLike + LapackElem,
     {
         let (u, s, vt) = mat.clone().thin_svd_owned(backend, Some(order));
         let s = s.mapv(T::from_real);
@@ -418,8 +422,7 @@ mod test {
 
     fn test_svd<T>(m: usize, n: usize, order: Layout, backend: SVDBackend, eps: T::Real)
     where
-        T: RCLike,
-        Array2<T>: Linalg<Elem = T>,
+        T: RCLike + LapackElem,
         T::Real: SampleUniform,
     {
         let sh = match order {

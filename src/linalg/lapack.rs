@@ -3,7 +3,7 @@ use std::{ffi::c_char, fmt::Debug, ptr::null_mut};
 use lapack_sys::*;
 use num_complex::{Complex, Complex32 as c32, Complex64 as c64};
 
-use crate::utils::{lapack, traits::RCLike};
+use crate::utils::traits::RCLike;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LapackChar {
@@ -140,8 +140,8 @@ macro_rules! lapack_gesvd_r {
     };
 }
 
-lapack_gesvd_r!(f64, lapack::dgesvd_);
-lapack_gesvd_r!(f32, lapack::sgesvd_);
+lapack_gesvd_r!(f64, dgesvd_);
+lapack_gesvd_r!(f32, sgesvd_);
 
 macro_rules! lapack_gesvd_c {
     ($t:ty, $fun:expr) => {
@@ -188,8 +188,8 @@ macro_rules! lapack_gesvd_c {
     };
 }
 
-lapack_gesvd_c!(f64, lapack::zgesvd_);
-lapack_gesvd_c!(f32, lapack::cgesvd_);
+lapack_gesvd_c!(f64, zgesvd_);
+lapack_gesvd_c!(f32, cgesvd_);
 
 pub(crate) trait LapackGESDD: RCLike {
     fn gesdd(
@@ -253,8 +253,8 @@ macro_rules! lapack_gesdd_r {
     };
 }
 
-lapack_gesdd_r!(f64, lapack::dgesdd_);
-lapack_gesdd_r!(f32, lapack::sgesdd_);
+lapack_gesdd_r!(f64, dgesdd_);
+lapack_gesdd_r!(f32, sgesdd_);
 
 macro_rules! lapack_gesdd_c {
     ($t:ty, $fun:expr) => {
@@ -301,8 +301,8 @@ macro_rules! lapack_gesdd_c {
     };
 }
 
-lapack_gesdd_c!(f64, lapack::zgesdd_);
-lapack_gesdd_c!(f32, lapack::cgesdd_);
+lapack_gesdd_c!(f64, zgesdd_);
+lapack_gesdd_c!(f32, cgesdd_);
 
 pub trait GEQR: RCLike {
     fn geqr(
@@ -350,11 +350,12 @@ macro_rules! lapack_geqr {
     };
 }
 
-lapack_geqr!(f64, f64, lapack::dgeqr_);
-lapack_geqr!(f32, f32, lapack::sgeqr_);
-lapack_geqr!(c64, __BindgenComplex<f64>, lapack::zgeqr_);
-lapack_geqr!(c32, __BindgenComplex<f32>, lapack::cgeqr_);
+lapack_geqr!(f64, f64, dgeqr_);
+lapack_geqr!(f32, f32, sgeqr_);
+lapack_geqr!(c64, __BindgenComplex<f64>, zgeqr_);
+lapack_geqr!(c32, __BindgenComplex<f32>, cgeqr_);
 
-pub(crate) trait LapackElem: RCLike + LapackGESVD + LapackGESDD + GEQR {}
+#[allow(private_bounds)]
+pub trait LapackElem: RCLike + LapackGESVD + LapackGESDD + GEQR {}
 
 impl<T> LapackElem for T where T: LapackGESVD + LapackGESDD + GEQR {}

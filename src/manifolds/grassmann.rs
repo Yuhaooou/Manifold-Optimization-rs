@@ -6,8 +6,7 @@ use rand_distr::{Distribution, StandardNormal};
 
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Exp, Manifold, RandomPoint};
 use crate::random_point_forward;
-use crate::utils::Linalg;
-use crate::utils::svd::{LinalgSVD, SVDBackend};
+use crate::linalg::{LapackElem, LinalgSVD};
 use crate::utils::traits::InnerProduct;
 use crate::utils::traits::RCLike;
 
@@ -46,8 +45,7 @@ where
 
 impl<D> Manifold for Grassmann<D>
 where
-    D: RCLike + ScalarOperand,
-    Array2<D>: Linalg<Elem = D>,
+    D: RCLike + ScalarOperand + LapackElem,
 {
     type Point = Array2<D>;
     type TangentVector = Array2<D>;
@@ -76,15 +74,14 @@ where
     }
 
     fn retraction(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
-        let (u, _, vt) = (point + tangent_vector).thin_svd_owned(SVDBackend::GESDD, None);
+        let (u, _, vt) = (point + tangent_vector).svd_owned();
         u.dot(&vt)
     }
 }
 
 impl<D> EGradToRGrad for Grassmann<D>
 where
-    D: RCLike + ScalarOperand,
-    Array2<D>: Linalg<Elem = D>,
+    D: RCLike + ScalarOperand + LapackElem,
 {
     fn egrad_to_rgrad(
         &self,
@@ -97,8 +94,7 @@ where
 
 impl<D> EHessToRHess for Grassmann<D>
 where
-    D: RCLike + ScalarOperand,
-    Array2<D>: Linalg<Elem = D>,
+    D: RCLike + ScalarOperand + LapackElem,
 {
     fn ehess_to_rhess(
         &self,
@@ -115,8 +111,7 @@ where
 
 impl<D> RandomPoint for Grassmann<D>
 where
-    D: RCLike + ScalarOperand,
-    ArrayBase<ndarray::OwnedRepr<D>, Ix2, D>: Linalg<Elem = D>, // Why?
+    D: RCLike + ScalarOperand + LapackElem,
     StandardNormal: Distribution<D::Real>,
 {
     random_point_forward!(StandardNormal);
@@ -127,18 +122,17 @@ where
         R: Rng + ?Sized,
     {
         let point = Array2::random_using((self.n, self.p), &dist, rng).mapv(D::from_real);
-        let (u, _, vt) = point.thin_svd_owned(SVDBackend::GESDD, None);
+        let (u, _, vt) = point.svd_owned();
         u.dot(&vt)
     }
 }
 
 impl<D> Exp for Grassmann<D>
 where
-    D: RCLike + ScalarOperand,
-    Array2<D>: Linalg<Elem = D>,
+    D: RCLike + ScalarOperand + LapackElem,
 {
     fn exp(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
-        let (u, s, vt) = tangent_vector.thin_svd_ref(SVDBackend::GESDD, None);
+        let (u, s, vt) = tangent_vector.svd_ref();
         let s = s.map(|x| D::from(*x).unwrap());
         let cos_s = Array::from_diag(&s.mapv(<D as ComplexFloat>::cos));
         let sin_s = Array::from_diag(&s.mapv(<D as ComplexFloat>::sin));
