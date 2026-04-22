@@ -64,11 +64,17 @@ where
     }
 
     fn retraction_qr(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
-        (point + tangent_vector).qr_().0
+        let (q, r) = (point + tangent_vector).qr_unique();
+        if r.mapv(D::abs).iter().all(|x| *x >= D::zero().re()) {
+            q
+        } else {
+            println!("Warning: Diagonal entries of R have negative real parts, flipping signs in Q.");
+            q
+        }
     }
 
     fn retraction_polar(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
-        let (u, _, vt) = (point + tangent_vector).svd_owned();
+        let (u, _, vt) = (point + tangent_vector).into_svd();
         u.dot(&vt)
     }
 
@@ -162,11 +168,11 @@ where
     {
         let point_real = Array2::random_using((self.n, self.p), &dist, rng).mapv(D::from_real);
         if D::IS_REAL {
-            return point_real.qr_().0;
+            return point_real.qr_unique().0;
         }
         let point_imag =
             Array2::random_using((self.n, self.p), &dist, rng).mapv(D::try_from_real_to_imag);
-        (point_real + point_imag).qr_().0
+        (point_real + point_imag).qr_unique().0
     }
 }
 

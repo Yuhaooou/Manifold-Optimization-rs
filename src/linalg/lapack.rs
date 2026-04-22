@@ -1,7 +1,8 @@
-use std::{ffi::c_char, fmt::Debug, ptr::null_mut};
+use std::{ffi::c_char, ptr::null_mut};
 
 use lapack_sys::*;
 use num_complex::{Complex, Complex32 as c32, Complex64 as c64};
+use openblas_src as _; // Ensure OpenBLAS is linked
 
 use crate::utils::traits::RCLike;
 
@@ -79,20 +80,27 @@ pub(crate) fn new_uninit_vec<T>(len: usize) -> Vec<T> {
     vec
 }
 
+fn as_mut_ptr_or_null<T>(opt: Option<&mut [T]>) -> *mut T {
+    match opt {
+        Some(slice) => slice.as_mut_ptr(),
+        None => null_mut(),
+    }
+}
+
 pub(crate) trait LapackGESVD: RCLike {
     fn gesvd(
         jobu: LapackChar,
         jobvt: LapackChar,
         m: i32,
         n: i32,
-        mat: *mut Self,
+        mat: &mut [Self],
         lda: i32,
-        s: *mut Self::Real,
-        u: Option<*mut Self>,
+        s: &mut [Self::Real],
+        u: Option<&mut [Self]>,
         ldu: i32,
-        vt: Option<*mut Self>,
+        vt: Option<&mut [Self]>,
         ldvt: i32,
-        work: *mut Self,
+        work: &mut [Self],
         lwork: i32,
     ) -> (i32, Option<Vec<Self::Real>>);
 }
@@ -105,14 +113,14 @@ macro_rules! lapack_gesvd_r {
                 jobvt: LapackChar,
                 m: i32,
                 n: i32,
-                mat: *mut Self,
+                mat: &mut [Self],
                 lda: i32,
-                s: *mut Self::Real,
-                u: Option<*mut Self>,
+                s: &mut [Self::Real],
+                u: Option<&mut [Self]>,
                 ldu: i32,
-                vt: Option<*mut Self>,
+                vt: Option<&mut [Self]>,
                 ldvt: i32,
-                work: *mut Self,
+                work: &mut [Self],
                 lwork: i32,
             ) -> (i32, Option<Vec<Self::Real>>) {
                 let mut info = 0;
@@ -122,14 +130,14 @@ macro_rules! lapack_gesvd_r {
                         jobvt.as_ptr(),
                         &m,
                         &n,
-                        mat as *mut $t,
+                        mat.as_mut_ptr(),
                         &lda,
-                        s as *mut $t,
-                        u.unwrap_or(null_mut()) as *mut $t,
+                        s.as_mut_ptr(),
+                        as_mut_ptr_or_null(u),
                         &ldu,
-                        vt.unwrap_or(null_mut()) as *mut $t,
+                        as_mut_ptr_or_null(vt),
                         &ldvt,
-                        work as *mut $t,
+                        work.as_mut_ptr(),
                         &lwork,
                         &mut info,
                     );
@@ -151,14 +159,14 @@ macro_rules! lapack_gesvd_c {
                 jobvt: LapackChar,
                 m: i32,
                 n: i32,
-                mat: *mut Self,
+                mat: &mut [Self],
                 lda: i32,
-                s: *mut Self::Real,
-                u: Option<*mut Self>,
+                s: &mut [Self::Real],
+                u: Option<&mut [Self]>,
                 ldu: i32,
-                vt: Option<*mut Self>,
+                vt: Option<&mut [Self]>,
                 ldvt: i32,
-                work: *mut Self,
+                work: &mut [Self],
                 lwork: i32,
             ) -> (i32, Option<Vec<Self::Real>>) {
                 let mut info = 0;
@@ -169,14 +177,16 @@ macro_rules! lapack_gesvd_c {
                         jobvt.as_ptr(),
                         &m,
                         &n,
-                        mat as *mut __BindgenComplex<$t>,
+                        mat.as_mut_ptr() as *mut __BindgenComplex<$t>,
                         &lda,
-                        s as *mut $t,
-                        u.unwrap_or(null_mut()) as *mut __BindgenComplex<$t>,
+                        s.as_mut_ptr() as *mut $t,
+                        as_mut_ptr_or_null(u)
+                            as *mut __BindgenComplex<$t>,
                         &ldu,
-                        vt.unwrap_or(null_mut()) as *mut __BindgenComplex<$t>,
+                        as_mut_ptr_or_null(vt)
+                            as *mut __BindgenComplex<$t>,
                         &ldvt,
-                        work as *mut __BindgenComplex<$t>,
+                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
                         &lwork,
                         rwork.as_mut_ptr(),
                         &mut info,
@@ -196,15 +206,15 @@ pub(crate) trait LapackGESDD: RCLike {
         jobz: LapackChar,
         m: i32,
         n: i32,
-        mat: *mut Self,
+        mat: &mut [Self],
         lda: i32,
-        s: *mut Self::Real,
-        u: Option<*mut Self>,
+        s: &mut [Self::Real],
+        u: Option<&mut [Self]>,
         ldu: i32,
-        vt: Option<*mut Self>,
+        vt: Option<&mut [Self]>,
         ldvt: i32,
-        work: *mut Self,
-        rwork: Option<*mut Self::Real>,
+        work: &mut [Self],
+        rwork: Option<&mut [Self::Real]>,
         lwork: i32,
     ) -> (i32, Vec<i32>);
 }
@@ -216,15 +226,15 @@ macro_rules! lapack_gesdd_r {
                 jobz: LapackChar,
                 m: i32,
                 n: i32,
-                mat: *mut Self,
+                mat: &mut [Self],
                 lda: i32,
-                s: *mut Self::Real,
-                u: Option<*mut Self>,
+                s: &mut [Self::Real],
+                u: Option<&mut [Self]>,
                 ldu: i32,
-                vt: Option<*mut Self>,
+                vt: Option<&mut [Self]>,
                 ldvt: i32,
-                work: *mut Self,
-                _rwork: Option<*mut Self::Real>,
+                work: &mut [Self],
+                _rwork: Option<&mut [Self::Real]>,
                 lwork: i32,
             ) -> (i32, Vec<i32>) {
                 let mut info = 0;
@@ -234,14 +244,14 @@ macro_rules! lapack_gesdd_r {
                         jobz.as_ptr(),
                         &m,
                         &n,
-                        mat as *mut $t,
+                        mat.as_mut_ptr(),
                         &lda,
-                        s as *mut $t,
-                        u.unwrap_or(null_mut()) as *mut $t,
+                        s.as_mut_ptr(),
+                        as_mut_ptr_or_null(u),
                         &ldu,
-                        vt.unwrap_or(null_mut()) as *mut $t,
+                        as_mut_ptr_or_null(vt),
                         &ldvt,
-                        work as *mut $t,
+                        work.as_mut_ptr(),
                         &lwork,
                         iwork.as_mut_ptr(),
                         &mut info,
@@ -263,15 +273,15 @@ macro_rules! lapack_gesdd_c {
                 jobz: LapackChar,
                 m: i32,
                 n: i32,
-                mat: *mut Self,
+                mat: &mut [Self],
                 lda: i32,
-                s: *mut Self::Real,
-                u: Option<*mut Self>,
+                s: &mut [Self::Real],
+                u: Option<&mut [Self]>,
                 ldu: i32,
-                vt: Option<*mut Self>,
+                vt: Option<&mut [Self]>,
                 ldvt: i32,
-                work: *mut Self,
-                rwork: Option<*mut Self::Real>,
+                work: &mut [Self],
+                rwork: Option<&mut [Self::Real]>,
                 lwork: i32,
             ) -> (i32, Vec<i32>) {
                 let mut info = 0;
@@ -281,16 +291,18 @@ macro_rules! lapack_gesdd_c {
                         jobz.as_ptr(),
                         &m,
                         &n,
-                        mat as *mut __BindgenComplex<$t>,
+                        mat.as_mut_ptr() as *mut __BindgenComplex<$t>,
                         &lda,
-                        s as *mut $t,
-                        u.unwrap_or(null_mut()) as *mut __BindgenComplex<$t>,
+                        s.as_mut_ptr() as *mut $t,
+                        as_mut_ptr_or_null(u)
+                            as *mut __BindgenComplex<$t>,
                         &ldu,
-                        vt.unwrap_or(null_mut()) as *mut __BindgenComplex<$t>,
+                        as_mut_ptr_or_null(vt)
+                            as *mut __BindgenComplex<$t>,
                         &ldvt,
-                        work as *mut __BindgenComplex<$t>,
+                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
                         &lwork,
-                        rwork.unwrap_or(null_mut()) as *mut $t,
+                        as_mut_ptr_or_null(rwork) as *mut $t,
                         iwork.as_mut_ptr(),
                         &mut info,
                     );
@@ -304,30 +316,30 @@ macro_rules! lapack_gesdd_c {
 lapack_gesdd_c!(f64, zgesdd_);
 lapack_gesdd_c!(f32, cgesdd_);
 
-pub trait GEQR: RCLike {
+pub trait LapackGEQR: RCLike {
     fn geqr(
         m: i32,
         n: i32,
-        mat: *mut Self,
+        mat: &mut [Self],
         lda: i32,
-        t: *mut Self,
+        t: &mut [Self],
         tsize: i32,
-        work: *mut Self,
+        work: &mut [Self],
         lwork: i32,
     ) -> i32;
 }
 
 macro_rules! lapack_geqr {
     ($t:ty, $tt:ty, $fun:expr) => {
-        impl GEQR for $t {
+        impl LapackGEQR for $t {
             fn geqr(
                 m: i32,
                 n: i32,
-                mat: *mut Self,
+                mat: &mut [Self],
                 lda: i32,
-                t: *mut Self,
+                t: &mut [Self],
                 tsize: i32,
-                work: *mut Self,
+                work: &mut [Self],
                 lwork: i32,
             ) -> i32 {
                 let mut info = 0;
@@ -335,11 +347,11 @@ macro_rules! lapack_geqr {
                     $fun(
                         &m,
                         &n,
-                        mat as *mut $tt,
+                        mat.as_mut_ptr() as *mut $tt,
                         &lda,
-                        t as *mut $tt,
+                        t.as_mut_ptr() as *mut $tt,
                         &tsize,
-                        work as *mut $tt,
+                        work.as_mut_ptr() as *mut $tt,
                         &lwork,
                         &mut info,
                     );
@@ -355,7 +367,183 @@ lapack_geqr!(f32, f32, sgeqr_);
 lapack_geqr!(c64, __BindgenComplex<f64>, zgeqr_);
 lapack_geqr!(c32, __BindgenComplex<f32>, cgeqr_);
 
-#[allow(private_bounds)]
-pub trait LapackElem: RCLike + LapackGESVD + LapackGESDD + GEQR {}
+pub trait LapackGEQRF: RCLike {
+    fn geqrf(
+        m: i32,
+        n: i32,
+        mat: &mut [Self],
+        lda: i32,
+        t: &mut [Self],
+        work: &mut [Self],
+        lwork: i32,
+    ) -> i32;
+}
 
-impl<T> LapackElem for T where T: LapackGESVD + LapackGESDD + GEQR {}
+pub trait LapackGEQRFP: RCLike {
+    fn geqrfp(
+        m: i32,
+        n: i32,
+        mat: &mut [Self],
+        lda: i32,
+        t: &mut [Self],
+        work: &mut [Self],
+        lwork: i32,
+    ) -> i32;
+}
+
+macro_rules! lapack_geqrf {
+    ($trait:ident, $trait_fun:ident, $t:ty, $tt:ty, $ffi_fun:expr) => {
+        impl $trait for $t {
+            fn $trait_fun(
+                m: i32,
+                n: i32,
+                mat: &mut [Self],
+                lda: i32,
+                t: &mut [Self],
+                work: &mut [Self],
+                lwork: i32,
+            ) -> i32 {
+                let mut info = 0;
+                unsafe {
+                    $ffi_fun(
+                        &m,
+                        &n,
+                        mat.as_mut_ptr() as *mut $tt,
+                        &lda,
+                        t.as_mut_ptr() as *mut $tt,
+                        work.as_mut_ptr() as *mut $tt,
+                        &lwork,
+                        &mut info,
+                    );
+                    info
+                }
+            }
+        }
+    };
+}
+
+lapack_geqrf!(LapackGEQRF, geqrf, f64, f64, dgeqrf_);
+lapack_geqrf!(LapackGEQRF, geqrf, f32, f32, sgeqrf_);
+lapack_geqrf!(LapackGEQRF, geqrf, c64, __BindgenComplex<f64>, zgeqrf_);
+lapack_geqrf!(LapackGEQRF, geqrf, c32, __BindgenComplex<f32>, cgeqrf_);
+
+// Same for geqrfp.
+lapack_geqrf!(LapackGEQRFP, geqrfp, f64, f64, dgeqrfp_);
+lapack_geqrf!(LapackGEQRFP, geqrfp, f32, f32, sgeqrfp_);
+lapack_geqrf!(LapackGEQRFP, geqrfp, c64, __BindgenComplex<f64>, zgeqrfp_);
+lapack_geqrf!(LapackGEQRFP, geqrfp, c32, __BindgenComplex<f32>, cgeqrfp_);
+
+pub trait LapackQfrom: RCLike {
+    fn qfrom(
+        m: i32,
+        n: i32,
+        k: i32,
+        a: &mut [Self],
+        lda: i32,
+        tau: &mut [Self],
+        work: &mut [Self],
+        lwork: i32,
+    ) -> i32;
+}
+
+macro_rules! Qfrom_r {
+    ($t:ty, $fun:expr) => {
+        impl LapackQfrom for $t {
+            fn qfrom(
+                m: i32,
+                n: i32,
+                k: i32,
+                a: &mut [Self],
+                lda: i32,
+                tau: &mut [Self],
+                work: &mut [Self],
+                lwork: i32,
+            ) -> i32 {
+                let mut info = 0;
+                unsafe {
+                    $fun(
+                        &m,
+                        &n,
+                        &k,
+                        a.as_mut_ptr() as *mut $t,
+                        &lda,
+                        tau.as_mut_ptr() as *mut $t,
+                        work.as_mut_ptr() as *mut $t,
+                        &lwork,
+                        &mut info,
+                    );
+                }
+                info
+            }
+        }
+    };
+}
+
+Qfrom_r!(f64, dorgqr_);
+Qfrom_r!(f32, sorgqr_);
+
+macro_rules! Qfrom_c {
+    ($t:ty, $fun:expr) => {
+        impl LapackQfrom for Complex<$t> {
+            fn qfrom(
+                m: i32,
+                n: i32,
+                k: i32,
+                a: &mut [Self],
+                lda: i32,
+                tau: &mut [Self],
+                work: &mut [Self],
+                lwork: i32,
+            ) -> i32 {
+                let mut info = 0;
+                unsafe {
+                    $fun(
+                        &m,
+                        &n,
+                        &k,
+                        a.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        &lda,
+                        tau.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        &lwork,
+                        &mut info,
+                    );
+                }
+                info
+            }
+        }
+    };
+}
+
+Qfrom_c!(f64, zungqr_);
+Qfrom_c!(f32, cungqr_);
+
+macro_rules! LapackElem {
+    ( $( $t:ident ),* ) => {
+        #[allow(private_bounds)]
+        pub trait LapackElem:
+            RCLike
+            $(
+                + $t
+            )*
+        {
+        }
+
+        impl<T> LapackElem for T where
+            T: RCLike
+            $(
+                + $t
+            )*
+        {
+        }
+    };
+}
+
+LapackElem!(
+    LapackGESVD,
+    LapackGESDD,
+    LapackGEQR,
+    LapackGEQRF,
+    LapackGEQRFP,
+    LapackQfrom
+);

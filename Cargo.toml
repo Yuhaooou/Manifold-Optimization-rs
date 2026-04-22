@@ -12,17 +12,14 @@ authors = [
 [dependencies]
 rand = "0.9.4"
 ndarray = { version = "0.17.2" }
-# ndarray-linalg = { version = "0.18.1", features = ["openblas-system"] }
 ndarray-rand = "0.16.0"
 argmin = "0.11.0"
 num-traits = "0.2"
 num-complex = "0.4.6"
-bon = "3.9.1"
 derive-new = "0.7.0"
 rand_distr = "0.5.1"
-# nalgebra = "0.34.2"
-openblas-src = {version = "0.10.15", features = ["system"]}
 lapack-sys = "0.15.0"
+openblas-src = {version = "0.10.15", features = ["system"]}
 
 [dev-dependencies]
 paste = "1.0"

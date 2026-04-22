@@ -133,12 +133,27 @@ impl SVDBackend {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SVDError {
+    Unconverged,
+}
+
+macro_rules! paste_svd_info {
+    ($info:expr) => {
+        if $info < 0 {
+            panic!("The {}-th argument had an illegal value.", -$info);
+        } else if $info > 0 {
+            return Err(SVDError::Unconverged);
+        }
+    };
+}
+
 /// Thin Svd for F-order matrixm. This funtion will destroy the input matrix.
 fn thin_svd_owned_impl<T>(
     mut mat: Array2<T>,
     order: Layout,
     backend: SVDBackend,
-) -> (Array2<T>, Array1<T::Real>, Array2<T>)
+) -> Result<(Array2<T>, Array1<T::Real>, Array2<T>), SVDError>
 where
     T: LapackElem,
 {
@@ -148,90 +163,94 @@ where
     } else {
         (mat.dim().1, mat.dim().0)
     };
-    let r = m.min(n);
-    let mut vec_s = new_uninit_vec(r);
-    let mut vec_u_or_vt = new_uninit_vec(r * r);
-    let u_pointer = if m >= n {
-        None
-    } else {
-        Some(vec_u_or_vt.as_mut_ptr())
-    };
-    let vt_pointer: Option<*mut T> = if m >= n {
-        Some(vec_u_or_vt.as_mut_ptr())
-    } else {
-        None
-    };
+    let k = m.min(n);
+    let mut vec_s = new_uninit_vec(k);
+    let mut u_or_vt = new_uninit_vec(k * k);
 
     match backend {
         SVDBackend::GESVD => {
             let jobu = if m >= n { LapackChar::O } else { LapackChar::S };
             let jobvt = if m >= n { LapackChar::S } else { LapackChar::O };
+            let (u_opt, vt_opt) = if m >= n {
+                (None, Some(u_or_vt.as_mut_slice()))
+            } else {
+                (Some(u_or_vt.as_mut_slice()), None)
+            };
             let mut work = [T::zero()];
             let (info1, _) = T::gesvd(
                 jobu,
                 jobvt,
                 m as i32,
                 n as i32,
-                mat.as_mut_ptr(),
+                mat.as_slice_memory_order_mut().unwrap(),
                 m as i32,
-                vec_s.as_mut_ptr(),
-                u_pointer,
+                &mut vec_s,
+                u_opt,
                 m as i32,
-                vt_pointer,
+                vt_opt,
                 n as i32,
-                work.as_mut_ptr(),
+                &mut work,
                 -1_i32,
             );
-            if info1 != 0 {
-                println!("gesvd returned non-zero info: {}", info1);
-            }
-            let work_len = work[0];
-            let mut work = Vec::with_capacity(work_len.to_usize().unwrap());
+            paste_svd_info!(info1);
+            let work_len = work[0].to_usize().unwrap();
+            let (u_opt, vt_opt) = if m >= n {
+                (None, Some(u_or_vt.as_mut_slice()))
+            } else {
+                (Some(u_or_vt.as_mut_slice()), None)
+            };
+            let mut work = new_uninit_vec(work_len);
             let (info2, _) = T::gesvd(
                 jobu,
                 jobvt,
                 m as i32,
                 n as i32,
-                mat.as_mut_ptr(),
+                mat.as_slice_memory_order_mut().unwrap(),
                 m as i32,
-                vec_s.as_mut_ptr(),
-                u_pointer,
+                &mut vec_s,
+                u_opt,
                 m as i32,
-                vt_pointer,
+                vt_opt,
                 n as i32,
-                work.as_mut_ptr(),
-                work_len.to_i32().unwrap(),
+                &mut work,
+                work_len as i32,
             );
-            if info2 != 0 {
-                println!("gesvd returned non-zero info: {}", info2);
-            }
+            paste_svd_info!(info2);
         }
         SVDBackend::GESDD => {
+            let (u_opt, vt_opt) = if m >= n {
+                (None, Some(u_or_vt.as_mut_slice()))
+            } else {
+                (Some(u_or_vt.as_mut_slice()), None)
+            };
             let mut work = [T::zero()];
             let (info1, _) = T::gesdd(
                 LapackChar::O,
                 m as i32,
                 n as i32,
-                mat.as_mut_ptr(),
+                mat.as_slice_memory_order_mut().unwrap(),
                 m as i32,
-                vec_s.as_mut_ptr(),
-                u_pointer,
+                &mut vec_s,
+                u_opt,
                 m as i32,
-                vt_pointer,
+                vt_opt,
                 n as i32,
-                work.as_mut_ptr(),
+                &mut work,
                 None,
                 -1_i32,
             );
-            if info1 != 0 {
-                println!("gesdd returned non-zero info: {}", info1);
-            }
-            let work_len = work[0];
-            let mut work = Vec::with_capacity(work_len.to_usize().unwrap());
+            paste_svd_info!(info1);
+            let (u_opt, vt_opt) = if m >= n {
+                (None, Some(u_or_vt.as_mut_slice()))
+            } else {
+                (Some(u_or_vt.as_mut_slice()), None)
+            };
+            let work_len = work[0].to_usize().unwrap();
+            let mut work = new_uninit_vec(work_len);
             // See Lapack gesdd documentation for details.
             let mut rwork = match T::IS_REAL {
-                true => None,
-                false => Some({
+                true => Vec::new(),
+                false => {
                     let mx = m.max(n) as usize;
                     let mn = m.min(n) as usize;
                     let rwork_len = if mx > 100 * mn {
@@ -240,30 +259,28 @@ where
                         (5 * mn * mx + 5 * mn).max(2 * mx * mn + 2 * mn * mn + mn)
                     };
                     new_uninit_vec(rwork_len)
-                }),
+                }
             };
             let (info2, _) = T::gesdd(
                 LapackChar::O,
                 m as i32,
                 n as i32,
-                mat.as_mut_ptr(),
+                mat.as_slice_memory_order_mut().unwrap(),
                 m as i32,
-                vec_s.as_mut_ptr(),
-                u_pointer,
+                &mut vec_s,
+                u_opt,
                 m as i32,
-                vt_pointer,
+                vt_opt,
                 n as i32,
-                work.as_mut_ptr(),
+                &mut work,
                 if T::IS_REAL {
                     None
                 } else {
-                    Some(rwork.as_mut().unwrap().as_mut_ptr())
+                    Some(rwork.as_mut_slice())
                 },
-                work_len.to_i32().unwrap(),
+                work_len as i32,
             );
-            if info2 != 0 {
-                println!("gesdd returned non-zero info: {}", info2);
-            }
+            paste_svd_info!(info2);
         }
         _ => unimplemented!("SVD backend {} is not implemented yet", backend),
     }
@@ -272,12 +289,12 @@ where
     let res_s;
     let res_vt;
     unsafe {
-        res_s = Array::from_shape_vec_unchecked(r, vec_s);
+        res_s = Array::from_shape_vec_unchecked(k, vec_s);
         res_s.dim();
 
         let u_or_vt = match order {
-            Layout::F => Array::from_shape_vec_unchecked((r, r).f(), vec_u_or_vt),
-            Layout::C => Array::from_shape_vec_unchecked((r, r), vec_u_or_vt),
+            Layout::F => Array::from_shape_vec_unchecked((k, k).f(), u_or_vt),
+            Layout::C => Array::from_shape_vec_unchecked((k, k), u_or_vt),
         };
         if m >= n {
             res_vt = u_or_vt;
@@ -289,8 +306,8 @@ where
     }
 
     match order {
-        Layout::F => (res_u, res_s, res_vt),
-        Layout::C => (res_vt, res_s, res_u),
+        Layout::F => Ok((res_u, res_s, res_vt)),
+        Layout::C => Ok((res_vt, res_s, res_u)),
     }
 }
 
@@ -299,7 +316,7 @@ fn thin_svd_owned<T>(
     mat: Array2<T>,
     backend: SVDBackend,
     order: Option<Layout>,
-) -> (Array2<T>, Array1<T::Real>, Array2<T>)
+) -> Result<(Array2<T>, Array1<T::Real>, Array2<T>), SVDError>
 where
     T: LapackElem,
 {
@@ -312,7 +329,7 @@ where
     } else {
         // TODO
         println!("== Untested: thin_svd_r_owned with owned non-contiguous Array. ==");
-        let (u, s, vt) = thin_svd_owned_impl(mat.to_owned(), Layout::C, backend);
+        let (u, s, vt) = thin_svd_owned_impl(mat.to_owned(), Layout::C, backend)?;
 
         debug_assert!(
             (u.dot(&Array2::from_diag(&s).mapv(T::from_real)).dot(&vt) - mat)
@@ -323,7 +340,7 @@ where
                 < num_traits::Float::sqrt(T::Real::epsilon()),
             "SVD result does not reconstruct the original matrix well. This may be a bug."
         );
-        (u, s, vt)
+        Ok((u, s, vt))
     }
 }
 
@@ -331,22 +348,22 @@ pub trait LinalgSVD {
     type Elem;
     type Real;
 
-    fn svd_owned(
-        self,
-    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
+    fn into_svd(self) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
 
-    fn svd_ref(
-        &self,
-    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
-
-    fn thin_svd_owned(
+    fn into_svd_with_backend_order(
         self,
         backend: SVDBackend,
         order: Option<Layout>,
     ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
 
-    fn thin_svd_ref(
+    fn svd(
         &self,
+        full_matrix: bool,
+    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
+
+    fn svd_with_backend_order(
+        &self,
+        full_matrix: bool,
         backend: SVDBackend,
         order: Option<Layout>,
     ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
@@ -359,32 +376,37 @@ where
     type Elem = T;
     type Real = T::Real;
 
-    fn svd_owned(
-            self,
-        ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
-        self.thin_svd_owned(SVDBackend::GESDD, None)
+    /// This method will destroy the input matrix.
+    fn into_svd(self) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
+        self.into_svd_with_backend_order(SVDBackend::GESDD, None)
     }
 
-    fn svd_ref(
-            &self,
-        ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
-        self.thin_svd_ref(SVDBackend::GESDD, None)
-    }
-
-    fn thin_svd_owned(
+    fn into_svd_with_backend_order(
         self,
         backend: SVDBackend,
         order: Option<Layout>,
     ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
-        thin_svd_owned(self, backend, order)
+        thin_svd_owned(self, backend, order).unwrap()
     }
 
-    fn thin_svd_ref(
+    fn svd(
         &self,
+        full_matrix: bool,
+    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
+        self.svd_with_backend_order(full_matrix, SVDBackend::GESDD, None)
+    }
+
+    fn svd_with_backend_order(
+        &self,
+        full_matrix: bool,
         backend: SVDBackend,
         order: Option<Layout>,
     ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
-        thin_svd_owned(self.to_owned(), backend, order)
+        if full_matrix {
+            unimplemented!("Full SVD is not implemented yet")
+        } else {
+            thin_svd_owned(self.to_owned(), backend, order).unwrap()
+        }
     }
 }
 
@@ -393,10 +415,9 @@ mod test {
     #![allow(dead_code, unused)]
     use ndarray_rand::RandomExt;
     use num_complex::{Complex32 as c32, Complex64 as c64};
+    use num_traits::ToPrimitive;
     use paste::item;
     use rand_distr::{Uniform, uniform::SampleUniform};
-
-    use crate::utils::{traits::RCLike};
 
     use super::{Layout::*, SVDBackend::*, *};
 
@@ -407,9 +428,9 @@ mod test {
 
     fn test_svd_inner<T>(mat: Array2<T>, backend: SVDBackend, order: Layout, eps: T::Real)
     where
-        T: RCLike + LapackElem,
+        T: LapackElem,
     {
-        let (u, s, vt) = mat.clone().thin_svd_owned(backend, Some(order));
+        let (u, s, vt) = mat.svd_with_backend_order(false, backend, Some(order));
         let s = s.mapv(T::from_real);
         let a_re = u.dot(&Array2::from_diag(&s)).dot(&vt);
         let err = (a_re - mat)
@@ -417,12 +438,16 @@ mod test {
             .map(T::abs)
             .reduce(T::Real::max)
             .unwrap_or(T::zero().re());
-        assert!(err < eps);
+        assert!(
+            err < eps,
+            "SVD decomposition is not accurate enough: err = {}",
+            err.to_f64().unwrap()
+        );
     }
 
     fn test_svd<T>(m: usize, n: usize, order: Layout, backend: SVDBackend, eps: T::Real)
     where
-        T: RCLike + LapackElem,
+        T: LapackElem,
         T::Real: SampleUniform,
     {
         let sh = match order {
