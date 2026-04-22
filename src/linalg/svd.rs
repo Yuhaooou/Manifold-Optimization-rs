@@ -138,16 +138,6 @@ pub enum SVDError {
     Unconverged,
 }
 
-macro_rules! paste_svd_info {
-    ($info:expr) => {
-        if $info < 0 {
-            panic!("The {}-th argument had an illegal value.", -$info);
-        } else if $info > 0 {
-            return Err(SVDError::Unconverged);
-        }
-    };
-}
-
 /// Thin Svd for F-order matrixm. This funtion will destroy the input matrix.
 fn thin_svd_owned_impl<T>(
     mut mat: Array2<T>,
@@ -164,20 +154,20 @@ where
         (mat.dim().1, mat.dim().0)
     };
     let k = m.min(n);
+
     let mut vec_s = new_uninit_vec(k);
     let mut u_or_vt = new_uninit_vec(k * k);
+    let (u_opt, vt_opt) = if m >= n {
+        (None, Some(u_or_vt.as_mut_slice()))
+    } else {
+        (Some(u_or_vt.as_mut_slice()), None)
+    };
 
     match backend {
         SVDBackend::GESVD => {
             let jobu = if m >= n { LapackChar::O } else { LapackChar::S };
             let jobvt = if m >= n { LapackChar::S } else { LapackChar::O };
-            let (u_opt, vt_opt) = if m >= n {
-                (None, Some(u_or_vt.as_mut_slice()))
-            } else {
-                (Some(u_or_vt.as_mut_slice()), None)
-            };
-            let mut work = [T::zero()];
-            let (info1, _) = T::gesvd(
+            let (info, _) = T::gesvd(
                 jobu,
                 jobvt,
                 m as i32,
@@ -189,79 +179,25 @@ where
                 m as i32,
                 vt_opt,
                 n as i32,
-                &mut work,
-                -1_i32,
             );
-            paste_svd_info!(info1);
-            let work_len = work[0].to_usize().unwrap();
-            let (u_opt, vt_opt) = if m >= n {
-                (None, Some(u_or_vt.as_mut_slice()))
-            } else {
-                (Some(u_or_vt.as_mut_slice()), None)
-            };
-            let mut work = new_uninit_vec(work_len);
-            let (info2, _) = T::gesvd(
-                jobu,
-                jobvt,
-                m as i32,
-                n as i32,
-                mat.as_slice_memory_order_mut().unwrap(),
-                m as i32,
-                &mut vec_s,
-                u_opt,
-                m as i32,
-                vt_opt,
-                n as i32,
-                &mut work,
-                work_len as i32,
-            );
-            paste_svd_info!(info2);
+            if info != 0 {
+                return Err(SVDError::Unconverged);
+            }
         }
         SVDBackend::GESDD => {
-            let (u_opt, vt_opt) = if m >= n {
-                (None, Some(u_or_vt.as_mut_slice()))
-            } else {
-                (Some(u_or_vt.as_mut_slice()), None)
-            };
-            let mut work = [T::zero()];
-            let (info1, _) = T::gesdd(
-                LapackChar::O,
-                m as i32,
-                n as i32,
-                mat.as_slice_memory_order_mut().unwrap(),
-                m as i32,
-                &mut vec_s,
-                u_opt,
-                m as i32,
-                vt_opt,
-                n as i32,
-                &mut work,
-                None,
-                -1_i32,
-            );
-            paste_svd_info!(info1);
-            let (u_opt, vt_opt) = if m >= n {
-                (None, Some(u_or_vt.as_mut_slice()))
-            } else {
-                (Some(u_or_vt.as_mut_slice()), None)
-            };
-            let work_len = work[0].to_usize().unwrap();
-            let mut work = new_uninit_vec(work_len);
-            // See Lapack gesdd documentation for details.
-            let mut rwork = match T::IS_REAL {
-                true => Vec::new(),
+            let lrwork = match T::IS_REAL {
+                true => 0,
                 false => {
                     let mx = m.max(n) as usize;
                     let mn = m.min(n) as usize;
-                    let rwork_len = if mx > 100 * mn {
+                    if mx > 100 * mn {
                         5 * mn * mn + 5 * mn
                     } else {
                         (5 * mn * mx + 5 * mn).max(2 * mx * mn + 2 * mn * mn + mn)
-                    };
-                    new_uninit_vec(rwork_len)
+                    }
                 }
             };
-            let (info2, _) = T::gesdd(
+            let info = T::gesdd(
                 LapackChar::O,
                 m as i32,
                 n as i32,
@@ -272,15 +208,11 @@ where
                 m as i32,
                 vt_opt,
                 n as i32,
-                &mut work,
-                if T::IS_REAL {
-                    None
-                } else {
-                    Some(rwork.as_mut_slice())
-                },
-                work_len as i32,
+                lrwork as i32,
             );
-            paste_svd_info!(info2);
+            if info != 0 {
+                return Err(SVDError::Unconverged);
+            }
         }
         _ => unimplemented!("SVD backend {} is not implemented yet", backend),
     }

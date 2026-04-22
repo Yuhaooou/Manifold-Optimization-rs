@@ -3,9 +3,9 @@ use ndarray_rand::RandomExt;
 use rand::Rng;
 use rand_distr::{Distribution, StandardNormal};
 
+use crate::linalg::{LapackElem, LinalgQR, LinalgSVD};
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold, RandomPoint};
 use crate::random_point_forward;
-use crate::linalg::{LapackElem, LinalgQR, LinalgSVD};
 use crate::utils::{
     tools::mat_sym,
     traits::{InnerProduct, RCLike},
@@ -68,7 +68,9 @@ where
         if r.mapv(D::abs).iter().all(|x| *x >= D::zero().re()) {
             q
         } else {
-            println!("Warning: Diagonal entries of R have negative real parts, flipping signs in Q.");
+            println!(
+                "Warning: Diagonal entries of R have negative real parts, flipping signs in Q."
+            );
             q
         }
     }

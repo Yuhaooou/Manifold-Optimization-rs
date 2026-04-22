@@ -100,9 +100,7 @@ pub(crate) trait LapackGESVD: RCLike {
         ldu: i32,
         vt: Option<&mut [Self]>,
         ldvt: i32,
-        work: &mut [Self],
-        lwork: i32,
-    ) -> (i32, Option<Vec<Self::Real>>);
+    ) -> (i32, Vec<Self::Real>);
 }
 
 macro_rules! lapack_gesvd_r {
@@ -120,10 +118,11 @@ macro_rules! lapack_gesvd_r {
                 ldu: i32,
                 vt: Option<&mut [Self]>,
                 ldvt: i32,
-                work: &mut [Self],
-                lwork: i32,
-            ) -> (i32, Option<Vec<Self::Real>>) {
+            ) -> (i32, Vec<Self::Real>) {
                 let mut info = 0;
+                let mut work = new_uninit_vec(1);
+                let u_ptr = as_mut_ptr_or_null(u);
+                let vt_ptr = as_mut_ptr_or_null(vt);
                 unsafe {
                     $fun(
                         jobu.as_ptr(),
@@ -133,16 +132,42 @@ macro_rules! lapack_gesvd_r {
                         mat.as_mut_ptr(),
                         &lda,
                         s.as_mut_ptr(),
-                        as_mut_ptr_or_null(u),
+                        u_ptr,
                         &ldu,
-                        as_mut_ptr_or_null(vt),
+                        vt_ptr,
                         &ldvt,
                         work.as_mut_ptr(),
-                        &lwork,
+                        &(-1),
                         &mut info,
                     );
-                    (info, None)
                 }
+                if info != 0 {
+                    panic!("Error in gesvd workspace query: {}", info);
+                }
+                let lwork = work[0] as usize;
+                let mut work = new_uninit_vec(lwork);
+                unsafe {
+                    $fun(
+                        jobu.as_ptr(),
+                        jobvt.as_ptr(),
+                        &m,
+                        &n,
+                        mat.as_mut_ptr(),
+                        &lda,
+                        s.as_mut_ptr(),
+                        u_ptr,
+                        &ldu,
+                        vt_ptr,
+                        &ldvt,
+                        work.as_mut_ptr(),
+                        &(lwork as i32),
+                        &mut info,
+                    );
+                }
+                if info < 0 {
+                    panic!("Illegal value in gesvd argument: {}", -info);
+                }
+                (info, work)
             }
         }
     };
@@ -166,11 +191,12 @@ macro_rules! lapack_gesvd_c {
                 ldu: i32,
                 vt: Option<&mut [Self]>,
                 ldvt: i32,
-                work: &mut [Self],
-                lwork: i32,
-            ) -> (i32, Option<Vec<Self::Real>>) {
+            ) -> (i32, Vec<Self::Real>) {
                 let mut info = 0;
                 let mut rwork = new_uninit_vec(5 * m.min(n) as usize);
+                let mut work = new_uninit_vec(1);
+                let u_ptr = as_mut_ptr_or_null(u);
+                let vt_ptr = as_mut_ptr_or_null(vt);
                 unsafe {
                     $fun(
                         jobu.as_ptr(),
@@ -180,19 +206,44 @@ macro_rules! lapack_gesvd_c {
                         mat.as_mut_ptr() as *mut __BindgenComplex<$t>,
                         &lda,
                         s.as_mut_ptr() as *mut $t,
-                        as_mut_ptr_or_null(u)
-                            as *mut __BindgenComplex<$t>,
+                        u_ptr as *mut __BindgenComplex<$t>,
                         &ldu,
-                        as_mut_ptr_or_null(vt)
-                            as *mut __BindgenComplex<$t>,
+                        vt_ptr as *mut __BindgenComplex<$t>,
                         &ldvt,
                         work.as_mut_ptr() as *mut __BindgenComplex<$t>,
-                        &lwork,
+                        &(-1),
                         rwork.as_mut_ptr(),
                         &mut info,
                     );
-                    (info, Some(rwork))
                 }
+                if info != 0 {
+                    panic!("Error in gesvd workspace query: {}", info);
+                }
+                let lwork = (work[0] as __BindgenComplex<$t>).re as usize;
+                let mut work = new_uninit_vec(lwork);
+                unsafe {
+                    $fun(
+                        jobu.as_ptr(),
+                        jobvt.as_ptr(),
+                        &m,
+                        &n,
+                        mat.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        &lda,
+                        s.as_mut_ptr() as *mut $t,
+                        u_ptr as *mut __BindgenComplex<$t>,
+                        &ldu,
+                        vt_ptr as *mut __BindgenComplex<$t>,
+                        &ldvt,
+                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        &(lwork as i32),
+                        rwork.as_mut_ptr(),
+                        &mut info,
+                    )
+                }
+                if info < 0 {
+                    panic!("Illegal value in gesvd argument: {}", -info);
+                }
+                (info, rwork)
             }
         }
     };
@@ -213,10 +264,8 @@ pub(crate) trait LapackGESDD: RCLike {
         ldu: i32,
         vt: Option<&mut [Self]>,
         ldvt: i32,
-        work: &mut [Self],
-        rwork: Option<&mut [Self::Real]>,
-        lwork: i32,
-    ) -> (i32, Vec<i32>);
+        lrwork: i32,
+    ) -> i32;
 }
 
 macro_rules! lapack_gesdd_r {
@@ -233,12 +282,13 @@ macro_rules! lapack_gesdd_r {
                 ldu: i32,
                 vt: Option<&mut [Self]>,
                 ldvt: i32,
-                work: &mut [Self],
-                _rwork: Option<&mut [Self::Real]>,
-                lwork: i32,
-            ) -> (i32, Vec<i32>) {
+                _lrwork: i32,
+            ) -> i32 {
                 let mut info = 0;
                 let mut iwork = new_uninit_vec(8 * m.min(n) as usize);
+                let mut work = new_uninit_vec(1);
+                let u_ptr = as_mut_ptr_or_null(u);
+                let vt_ptr = as_mut_ptr_or_null(vt);
                 unsafe {
                     $fun(
                         jobz.as_ptr(),
@@ -247,17 +297,43 @@ macro_rules! lapack_gesdd_r {
                         mat.as_mut_ptr(),
                         &lda,
                         s.as_mut_ptr(),
-                        as_mut_ptr_or_null(u),
+                        u_ptr,
                         &ldu,
-                        as_mut_ptr_or_null(vt),
+                        vt_ptr,
                         &ldvt,
                         work.as_mut_ptr(),
-                        &lwork,
+                        &(-1),
                         iwork.as_mut_ptr(),
                         &mut info,
                     );
-                    (info, iwork)
                 }
+                if info != 0 {
+                    panic!("Error in gesdd workspace query: {}", info);
+                }
+                let lwork = work[0] as usize;
+                let mut work = new_uninit_vec(lwork);
+                unsafe {
+                    $fun(
+                        jobz.as_ptr(),
+                        &m,
+                        &n,
+                        mat.as_mut_ptr(),
+                        &lda,
+                        s.as_mut_ptr(),
+                        u_ptr,
+                        &ldu,
+                        vt_ptr,
+                        &ldvt,
+                        work.as_mut_ptr(),
+                        &(lwork as i32),
+                        iwork.as_mut_ptr(),
+                        &mut info,
+                    );
+                }
+                if info < 0 {
+                    panic!("Illegal value in gesdd argument: {}", -info);
+                }
+                info
             }
         }
     };
@@ -280,12 +356,13 @@ macro_rules! lapack_gesdd_c {
                 ldu: i32,
                 vt: Option<&mut [Self]>,
                 ldvt: i32,
-                work: &mut [Self],
-                rwork: Option<&mut [Self::Real]>,
-                lwork: i32,
-            ) -> (i32, Vec<i32>) {
+                lrwork: i32,
+            ) -> i32 {
                 let mut info = 0;
                 let mut iwork = new_uninit_vec(8 * m.min(n) as usize);
+                let mut work = new_uninit_vec(1);
+                let u_ptr = as_mut_ptr_or_null(u);
+                let vt_ptr = as_mut_ptr_or_null(vt);
                 unsafe {
                     $fun(
                         jobz.as_ptr(),
@@ -294,20 +371,46 @@ macro_rules! lapack_gesdd_c {
                         mat.as_mut_ptr() as *mut __BindgenComplex<$t>,
                         &lda,
                         s.as_mut_ptr() as *mut $t,
-                        as_mut_ptr_or_null(u)
-                            as *mut __BindgenComplex<$t>,
+                        u_ptr as *mut __BindgenComplex<$t>,
                         &ldu,
-                        as_mut_ptr_or_null(vt)
-                            as *mut __BindgenComplex<$t>,
+                        vt_ptr as *mut __BindgenComplex<$t>,
                         &ldvt,
                         work.as_mut_ptr() as *mut __BindgenComplex<$t>,
-                        &lwork,
-                        as_mut_ptr_or_null(rwork) as *mut $t,
+                        &(-1),
+                        null_mut() as *mut $t,
                         iwork.as_mut_ptr(),
                         &mut info,
                     );
-                    (info, iwork)
                 }
+                if info != 0 {
+                    panic!("Error in gesdd workspace query: {}", info);
+                }
+                let lwork = (work[0] as __BindgenComplex<$t>).re as usize;
+                let mut work = new_uninit_vec(lwork);
+                let mut rwork = new_uninit_vec(lrwork as usize);
+                unsafe {
+                    $fun(
+                        jobz.as_ptr(),
+                        &m,
+                        &n,
+                        mat.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        &lda,
+                        s.as_mut_ptr() as *mut $t,
+                        u_ptr as *mut __BindgenComplex<$t>,
+                        &ldu,
+                        vt_ptr as *mut __BindgenComplex<$t>,
+                        &ldvt,
+                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        &(lwork as i32),
+                        rwork.as_mut_ptr(),
+                        iwork.as_mut_ptr(),
+                        &mut info,
+                    );
+                }
+                if info < 0 {
+                    panic!("Illegal value in gesdd argument: {}", -info);
+                }
+                info
             }
         }
     };
@@ -317,47 +420,33 @@ lapack_gesdd_c!(f64, zgesdd_);
 lapack_gesdd_c!(f32, cgesdd_);
 
 pub trait LapackGEQR: RCLike {
-    fn geqr(
-        m: i32,
-        n: i32,
-        mat: &mut [Self],
-        lda: i32,
-        t: &mut [Self],
-        tsize: i32,
-        work: &mut [Self],
-        lwork: i32,
-    ) -> i32;
+    // fn geqr(
+    //     m: i32,
+    //     n: i32,
+    //     mat: &mut [Self],
+    //     lda: i32,
+    //     t: &mut [Self],
+    //     tsize: i32,
+    //     work: &mut [Self],
+    //     lwork: i32,
+    // ) -> i32;
 }
 
 macro_rules! lapack_geqr {
     ($t:ty, $tt:ty, $fun:expr) => {
         impl LapackGEQR for $t {
-            fn geqr(
-                m: i32,
-                n: i32,
-                mat: &mut [Self],
-                lda: i32,
-                t: &mut [Self],
-                tsize: i32,
-                work: &mut [Self],
-                lwork: i32,
-            ) -> i32 {
-                let mut info = 0;
-                unsafe {
-                    $fun(
-                        &m,
-                        &n,
-                        mat.as_mut_ptr() as *mut $tt,
-                        &lda,
-                        t.as_mut_ptr() as *mut $tt,
-                        &tsize,
-                        work.as_mut_ptr() as *mut $tt,
-                        &lwork,
-                        &mut info,
-                    );
-                    info
-                }
-            }
+            // fn geqr(
+            //     m: i32,
+            //     n: i32,
+            //     mat: &mut [Self],
+            //     lda: i32,
+            //     t: &mut [Self],
+            //     tsize: i32,
+            //     work: &mut [Self],
+            //     lwork: i32,
+            // ) -> i32 {
+            //     unimplemented!("GEQR");
+            // }
         }
     };
 }
@@ -368,42 +457,23 @@ lapack_geqr!(c64, __BindgenComplex<f64>, zgeqr_);
 lapack_geqr!(c32, __BindgenComplex<f32>, cgeqr_);
 
 pub trait LapackGEQRF: RCLike {
-    fn geqrf(
-        m: i32,
-        n: i32,
-        mat: &mut [Self],
-        lda: i32,
-        t: &mut [Self],
-        work: &mut [Self],
-        lwork: i32,
-    ) -> i32;
+    fn geqrf(m: i32, n: i32, mat: &mut [Self], lda: i32, t: &mut [Self]) -> i32;
 }
 
 pub trait LapackGEQRFP: RCLike {
-    fn geqrfp(
-        m: i32,
-        n: i32,
-        mat: &mut [Self],
-        lda: i32,
-        t: &mut [Self],
-        work: &mut [Self],
-        lwork: i32,
-    ) -> i32;
+    fn geqrfp(m: i32, n: i32, mat: &mut [Self], lda: i32, t: &mut [Self]) -> i32;
+}
+
+fn from_rclike_to_usize<T: RCLike>(x: T) -> usize {
+    x.to_usize().unwrap()
 }
 
 macro_rules! lapack_geqrf {
     ($trait:ident, $trait_fun:ident, $t:ty, $tt:ty, $ffi_fun:expr) => {
         impl $trait for $t {
-            fn $trait_fun(
-                m: i32,
-                n: i32,
-                mat: &mut [Self],
-                lda: i32,
-                t: &mut [Self],
-                work: &mut [Self],
-                lwork: i32,
-            ) -> i32 {
+            fn $trait_fun(m: i32, n: i32, mat: &mut [Self], lda: i32, t: &mut [Self]) -> i32 {
                 let mut info = 0;
+                let mut work = new_uninit_vec(1);
                 unsafe {
                     $ffi_fun(
                         &m,
@@ -412,11 +482,32 @@ macro_rules! lapack_geqrf {
                         &lda,
                         t.as_mut_ptr() as *mut $tt,
                         work.as_mut_ptr() as *mut $tt,
-                        &lwork,
+                        &(-1),
                         &mut info,
                     );
-                    info
                 }
+                if info != 0 {
+                    panic!("Error in geqrf workspace query: {}", info);
+                }
+                let work0 = unsafe { *(&work[0] as *const $tt as *const $t) };
+                let lwork = from_rclike_to_usize(work0);
+                let mut work = new_uninit_vec(lwork);
+                unsafe {
+                    $ffi_fun(
+                        &m,
+                        &n,
+                        mat.as_mut_ptr() as *mut $tt,
+                        &lda,
+                        t.as_mut_ptr() as *mut $tt,
+                        work.as_mut_ptr() as *mut $tt,
+                        &(lwork as i32),
+                        &mut info,
+                    );
+                }
+                if info < 0 {
+                    panic!("Illegal value in geqrf argument: {}", -info);
+                }
+                info
             }
         }
     };
@@ -434,32 +525,15 @@ lapack_geqrf!(LapackGEQRFP, geqrfp, c64, __BindgenComplex<f64>, zgeqrfp_);
 lapack_geqrf!(LapackGEQRFP, geqrfp, c32, __BindgenComplex<f32>, cgeqrfp_);
 
 pub trait LapackQfrom: RCLike {
-    fn qfrom(
-        m: i32,
-        n: i32,
-        k: i32,
-        a: &mut [Self],
-        lda: i32,
-        tau: &mut [Self],
-        work: &mut [Self],
-        lwork: i32,
-    ) -> i32;
+    fn qfrom(m: i32, n: i32, k: i32, a: &mut [Self], lda: i32, tau: &mut [Self]) -> i32;
 }
 
 macro_rules! Qfrom_r {
     ($t:ty, $fun:expr) => {
         impl LapackQfrom for $t {
-            fn qfrom(
-                m: i32,
-                n: i32,
-                k: i32,
-                a: &mut [Self],
-                lda: i32,
-                tau: &mut [Self],
-                work: &mut [Self],
-                lwork: i32,
-            ) -> i32 {
+            fn qfrom(m: i32, n: i32, k: i32, a: &mut [Self], lda: i32, tau: &mut [Self]) -> i32 {
                 let mut info = 0;
+                let mut work = new_uninit_vec(1);
                 unsafe {
                     $fun(
                         &m,
@@ -469,9 +543,30 @@ macro_rules! Qfrom_r {
                         &lda,
                         tau.as_mut_ptr() as *mut $t,
                         work.as_mut_ptr() as *mut $t,
-                        &lwork,
+                        &(-1),
                         &mut info,
                     );
+                }
+                if info != 0 {
+                    panic!("Error in qfrom workspace query: {}", info);
+                }
+                let lwork = work[0] as usize;
+                let mut work = new_uninit_vec(lwork);
+                unsafe {
+                    $fun(
+                        &m,
+                        &n,
+                        &k,
+                        a.as_mut_ptr() as *mut $t,
+                        &lda,
+                        tau.as_mut_ptr() as *mut $t,
+                        work.as_mut_ptr() as *mut $t,
+                        &(lwork as i32),
+                        &mut info,
+                    );
+                }
+                if info < 0 {
+                    panic!("Illegal value in qfrom argument: {}", -info);
                 }
                 info
             }
@@ -485,17 +580,9 @@ Qfrom_r!(f32, sorgqr_);
 macro_rules! Qfrom_c {
     ($t:ty, $fun:expr) => {
         impl LapackQfrom for Complex<$t> {
-            fn qfrom(
-                m: i32,
-                n: i32,
-                k: i32,
-                a: &mut [Self],
-                lda: i32,
-                tau: &mut [Self],
-                work: &mut [Self],
-                lwork: i32,
-            ) -> i32 {
+            fn qfrom(m: i32, n: i32, k: i32, a: &mut [Self], lda: i32, tau: &mut [Self]) -> i32 {
                 let mut info = 0;
+                let mut work = new_uninit_vec(1);
                 unsafe {
                     $fun(
                         &m,
@@ -505,9 +592,33 @@ macro_rules! Qfrom_c {
                         &lda,
                         tau.as_mut_ptr() as *mut __BindgenComplex<$t>,
                         work.as_mut_ptr() as *mut __BindgenComplex<$t>,
-                        &lwork,
+                        &(-1),
                         &mut info,
                     );
+                }
+                if info != 0 {
+                    panic!("Error in qfrom workspace query: {}", info);
+                }
+                let lwork = (unsafe {
+                    *(&work[0] as *const __BindgenComplex<$t> as *const Complex<$t>)
+                })
+                .re as usize;
+                let mut work = new_uninit_vec(lwork);
+                unsafe {
+                    $fun(
+                        &m,
+                        &n,
+                        &k,
+                        a.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        &lda,
+                        tau.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        &(lwork as i32),
+                        &mut info,
+                    );
+                }
+                if info < 0 {
+                    panic!("Illegal value in qfrom argument: {}", -info);
                 }
                 info
             }

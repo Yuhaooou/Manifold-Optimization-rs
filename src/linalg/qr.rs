@@ -24,32 +24,15 @@ where
 
     // Haouseholder
     let mut tau = new_uninit_vec(k);
-    let mut work = [T::zero()];
-    let info1 = geqrf(
+    let info = geqrf(
         m as i32,
         n as i32,
         mat.as_slice_memory_order_mut().unwrap(),
         m as i32,
         tau.as_mut_slice(),
-        &mut work,
-        -1,
     );
-    if info1 != 0 {
-        panic!("Error in geqrf: {}", info1);
-    }
-    let lwork = work[0].to_usize().unwrap();
-    let mut work = new_uninit_vec(lwork);
-    let info2 = geqrf(
-        m as i32,
-        n as i32,
-        mat.as_slice_memory_order_mut().unwrap(),
-        m as i32,
-        tau.as_mut_slice(),
-        &mut work,
-        lwork as i32,
-    );
-    if info2 != 0 {
-        panic!("Error in geqrf: {}", info2);
+    if info != 0 {
+        panic!("Error in geqrf: {}", info);
     }
 
     let mat_r = if m > n {
@@ -59,34 +42,16 @@ where
     };
 
     // reconstruct q
-    let mut work = [T::zero()];
-    let info1 = T::qfrom(
+    let info = T::qfrom(
         m as i32,
         k as i32,
         k as i32,
         mat.as_slice_memory_order_mut().unwrap(),
         m as i32,
         tau.as_mut_slice(),
-        &mut work,
-        -1,
     );
-    if info1 != 0 {
-        panic!("Error in qfrom: {}", info1);
-    }
-    let lwork = work[0].to_usize().unwrap();
-    let mut work = new_uninit_vec(lwork);
-    let info2 = T::qfrom(
-        m as i32,
-        k as i32,
-        k as i32,
-        mat.as_slice_memory_order_mut().unwrap(),
-        m as i32,
-        tau.as_mut_slice(),
-        work.as_mut_slice(),
-        lwork as i32,
-    );
-    if info2 != 0 {
-        panic!("Error in qfrom: {}", info2);
+    if info != 0 {
+        panic!("Error in qfrom: {}", info);
     }
 
     let mat_q = if k < n {
@@ -101,19 +66,17 @@ where
 pub trait LinalgQR {
     type Elem;
 
-    fn into_qr(self) -> (Array2<Self::Elem>, Array2<Self::Elem>);
-
     fn into_qr_with_backend(self, backend: QRBackend) -> (Array2<Self::Elem>, Array2<Self::Elem>);
 
-    fn qr(&self) -> (Array2<Self::Elem>, Array2<Self::Elem>) {
-        self.qr_with_backend(QRBackend::GEQRF)
-    }
+    fn into_qr(self) -> (Array2<Self::Elem>, Array2<Self::Elem>);
 
-    fn qr_unique(&self) -> (Array2<Self::Elem>, Array2<Self::Elem>) {
-        self.qr_with_backend(QRBackend::GEQRFP)
-    }
+    fn into_qr_unique(self) -> (Array2<Self::Elem>, Array2<Self::Elem>);
 
     fn qr_with_backend(&self, backend: QRBackend) -> (Array2<Self::Elem>, Array2<Self::Elem>);
+
+    fn qr(&self) -> (Array2<Self::Elem>, Array2<Self::Elem>);
+
+    fn qr_unique(&self) -> (Array2<Self::Elem>, Array2<Self::Elem>);
 }
 
 impl<T> LinalgQR for Array2<T>
@@ -121,10 +84,6 @@ where
     T: LapackElem,
 {
     type Elem = T;
-
-    fn into_qr(self) -> (Array2<Self::Elem>, Array2<Self::Elem>) {
-        self.into_qr_with_backend(QRBackend::GEQRF)
-    }
 
     fn into_qr_with_backend(self, backend: QRBackend) -> (Array2<Self::Elem>, Array2<Self::Elem>) {
         if self.t().is_standard_layout() {
@@ -138,8 +97,24 @@ where
         }
     }
 
+    fn into_qr(self) -> (Array2<Self::Elem>, Array2<Self::Elem>) {
+        self.into_qr_with_backend(QRBackend::GEQRF)
+    }
+
+    fn into_qr_unique(self) -> (Array2<Self::Elem>, Array2<Self::Elem>) {
+        self.into_qr_with_backend(QRBackend::GEQRFP)
+    }
+
     fn qr_with_backend(&self, backend: QRBackend) -> (Array2<Self::Elem>, Array2<Self::Elem>) {
         self.to_owned().into_qr_with_backend(backend)
+    }
+
+    fn qr(&self) -> (Array2<Self::Elem>, Array2<Self::Elem>) {
+        self.qr_with_backend(QRBackend::GEQRF)
+    }
+
+    fn qr_unique(&self) -> (Array2<Self::Elem>, Array2<Self::Elem>) {
+        self.qr_with_backend(QRBackend::GEQRFP)
     }
 }
 
@@ -154,12 +129,12 @@ mod tests {
     use paste::item;
     use rand_distr::{Uniform, uniform::SampleUniform};
 
-    use super::{*, QRBackend::*};
+    use super::{QRBackend::*, *};
     use crate::linalg::lapack::Layout::{C, F};
     use crate::utils::traits::RCLike;
 
-    const M: usize = 5;
-    const N: usize = 4;
+    const M: usize = 50;
+    const N: usize = 40;
     const EPS_F64: f64 = 1e-12;
     const EPS_F32: f32 = 1e-5;
 

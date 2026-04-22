@@ -1,8 +1,6 @@
 use ndarray::{ScalarOperand, prelude::*};
 
-use crate::utils::{
-    traits::{InnerProduct, Norm as VectorNorm, RCLike, Vector},
-};
+use crate::utils::traits::{InnerProduct, Norm as VectorNorm, RCLike, Vector};
 
 impl<D, IxN> Vector for Array<D, IxN>
 where
@@ -76,7 +74,11 @@ where
     type Field = K;
 
     fn norm(&self) -> K {
-        self.iter().map(|x| x.powi(2)).reduce(K::add).unwrap_or(K::zero()).sqrt()
+        self.iter()
+            .map(|x| x.powi(2))
+            .reduce(K::add)
+            .unwrap_or(K::zero())
+            .sqrt()
     }
 }
 

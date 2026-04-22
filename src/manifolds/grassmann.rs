@@ -4,9 +4,9 @@ use num_complex::ComplexFloat;
 use rand::Rng;
 use rand_distr::{Distribution, StandardNormal};
 
+use crate::linalg::{LapackElem, LinalgSVD};
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Exp, Manifold, RandomPoint};
 use crate::random_point_forward;
-use crate::linalg::{LapackElem, LinalgSVD};
 use crate::utils::traits::InnerProduct;
 use crate::utils::traits::RCLike;
 
