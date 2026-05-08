@@ -1,6 +1,9 @@
 use ndarray::prelude::*;
 
-use crate::linalg::lapack::{LapackElem, Layout, new_uninit_vec};
+use crate::{
+    linalg::lapack::{LapackElem, Layout, new_uninit_vec},
+    utils::tools::has_nan,
+};
 
 pub enum QRBackend {
     GEQRF,
@@ -11,6 +14,12 @@ fn qr_owned_impl<T>(mut mat: Array2<T>, order: Layout, backend: QRBackend) -> (A
 where
     T: LapackElem,
 {
+    let is_check_nan = false;
+
+    if is_check_nan {
+        assert!(has_nan(&mat), "Input matrix contains NaN values.");
+    }
+
     let (m, n) = match order {
         Layout::F => mat.dim(),
         Layout::C => (mat.dim().1, mat.dim().0),
@@ -35,11 +44,7 @@ where
         panic!("Error in geqrf: {}", info);
     }
 
-    let mat_r = if m > n {
-        mat.slice(s![..n, ..]).to_owned().triu(0)
-    } else {
-        mat.triu(0)
-    };
+    let mat_r = mat.slice(s![..k, ..]).triu(0);
 
     // reconstruct q
     let info = T::qfrom(
@@ -54,10 +59,20 @@ where
         panic!("Error in qfrom: {}", info);
     }
 
-    let mat_q = if k < n {
+    // #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    // enum Qstatus {
+    //     Auto,
+    //     Contiguous,
+    //     ForceMove,
+    // }
+
+    // // Ensure the returned Q is contiguous.
+    // let q_status = Qstatus::Auto;
+
+    let mat_q = if n >= 2 * k {
         mat.slice(s![.., ..k]).to_owned()
     } else {
-        mat
+        mat.slice_move(s![.., ..k])
     };
 
     (mat_q, mat_r)

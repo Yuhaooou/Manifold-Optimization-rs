@@ -64,15 +64,8 @@ where
     }
 
     fn retraction_qr(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
-        let (q, r) = (point + tangent_vector).qr_unique();
-        if r.mapv(D::abs).iter().all(|x| *x >= D::zero().re()) {
-            q
-        } else {
-            println!(
-                "Warning: Diagonal entries of R have negative real parts, flipping signs in Q."
-            );
-            q
-        }
+        let (q, _) = (point + tangent_vector).qr_unique();
+        q
     }
 
     fn retraction_polar(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {

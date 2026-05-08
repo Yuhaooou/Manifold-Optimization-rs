@@ -1,7 +1,8 @@
-use std::{ffi::c_char, ptr::null_mut};
+use std::{ffi::c_char, mem::transmute, ptr::null_mut};
 
-use lapack_sys::*;
+use lapack_sys::{__BindgenComplex as LapackComplex, *};
 use num_complex::{Complex, Complex32 as c32, Complex64 as c64};
+use num_traits::ToPrimitive;
 use openblas_src as _; // Ensure OpenBLAS is linked
 
 use crate::utils::traits::RCLike;
@@ -67,11 +68,11 @@ impl Layout {
 }
 
 #[inline]
-pub fn to_lapack_complex<T: Copy>(c: &Complex<T>) -> __BindgenComplex<T> {
+pub fn to_lapack_complex<T: Copy>(c: &Complex<T>) -> LapackComplex<T> {
     // unsafe {
-    //     *(c as *const Complex<T> as *const __BindgenComplex<T>)
+    //     *(c as *const Complex<T> as *const LapackComplex<T>)
     // }
-    __BindgenComplex { re: c.re, im: c.im }
+    LapackComplex { re: c.re, im: c.im }
 }
 
 pub(crate) fn new_uninit_vec<T>(len: usize) -> Vec<T> {
@@ -203,14 +204,14 @@ macro_rules! lapack_gesvd_c {
                         jobvt.as_ptr(),
                         &m,
                         &n,
-                        mat.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        mat.as_mut_ptr() as *mut LapackComplex<$t>,
                         &lda,
                         s.as_mut_ptr() as *mut $t,
-                        u_ptr as *mut __BindgenComplex<$t>,
+                        u_ptr as *mut LapackComplex<$t>,
                         &ldu,
-                        vt_ptr as *mut __BindgenComplex<$t>,
+                        vt_ptr as *mut LapackComplex<$t>,
                         &ldvt,
-                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        work.as_mut_ptr() as *mut LapackComplex<$t>,
                         &(-1),
                         rwork.as_mut_ptr(),
                         &mut info,
@@ -219,7 +220,7 @@ macro_rules! lapack_gesvd_c {
                 if info != 0 {
                     panic!("Error in gesvd workspace query: {}", info);
                 }
-                let lwork = (work[0] as __BindgenComplex<$t>).re as usize;
+                let lwork = (work[0] as LapackComplex<$t>).re as usize;
                 let mut work = new_uninit_vec(lwork);
                 unsafe {
                     $fun(
@@ -227,14 +228,14 @@ macro_rules! lapack_gesvd_c {
                         jobvt.as_ptr(),
                         &m,
                         &n,
-                        mat.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        mat.as_mut_ptr() as *mut LapackComplex<$t>,
                         &lda,
                         s.as_mut_ptr() as *mut $t,
-                        u_ptr as *mut __BindgenComplex<$t>,
+                        u_ptr as *mut LapackComplex<$t>,
                         &ldu,
-                        vt_ptr as *mut __BindgenComplex<$t>,
+                        vt_ptr as *mut LapackComplex<$t>,
                         &ldvt,
-                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        work.as_mut_ptr() as *mut LapackComplex<$t>,
                         &(lwork as i32),
                         rwork.as_mut_ptr(),
                         &mut info,
@@ -368,14 +369,14 @@ macro_rules! lapack_gesdd_c {
                         jobz.as_ptr(),
                         &m,
                         &n,
-                        mat.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        mat.as_mut_ptr() as *mut LapackComplex<$t>,
                         &lda,
                         s.as_mut_ptr() as *mut $t,
-                        u_ptr as *mut __BindgenComplex<$t>,
+                        u_ptr as *mut LapackComplex<$t>,
                         &ldu,
-                        vt_ptr as *mut __BindgenComplex<$t>,
+                        vt_ptr as *mut LapackComplex<$t>,
                         &ldvt,
-                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        work.as_mut_ptr() as *mut LapackComplex<$t>,
                         &(-1),
                         null_mut() as *mut $t,
                         iwork.as_mut_ptr(),
@@ -385,7 +386,7 @@ macro_rules! lapack_gesdd_c {
                 if info != 0 {
                     panic!("Error in gesdd workspace query: {}", info);
                 }
-                let lwork = (work[0] as __BindgenComplex<$t>).re as usize;
+                let lwork = (work[0] as LapackComplex<$t>).re as usize;
                 let mut work = new_uninit_vec(lwork);
                 let mut rwork = new_uninit_vec(lrwork as usize);
                 unsafe {
@@ -393,14 +394,14 @@ macro_rules! lapack_gesdd_c {
                         jobz.as_ptr(),
                         &m,
                         &n,
-                        mat.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        mat.as_mut_ptr() as *mut LapackComplex<$t>,
                         &lda,
                         s.as_mut_ptr() as *mut $t,
-                        u_ptr as *mut __BindgenComplex<$t>,
+                        u_ptr as *mut LapackComplex<$t>,
                         &ldu,
-                        vt_ptr as *mut __BindgenComplex<$t>,
+                        vt_ptr as *mut LapackComplex<$t>,
                         &ldvt,
-                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
+                        work.as_mut_ptr() as *mut LapackComplex<$t>,
                         &(lwork as i32),
                         rwork.as_mut_ptr(),
                         iwork.as_mut_ptr(),
@@ -419,11 +420,11 @@ macro_rules! lapack_gesdd_c {
 lapack_gesdd_c!(f64, zgesdd_);
 lapack_gesdd_c!(f32, cgesdd_);
 
-pub trait LapackGEQR: RCLike {
+pub(crate) trait LapackGEQR: RCLike {
     // fn geqr(
     //     m: i32,
     //     n: i32,
-    //     mat: &mut [Self],
+    //     a: &mut [Self],
     //     lda: i32,
     //     t: &mut [Self],
     //     tsize: i32,
@@ -433,12 +434,12 @@ pub trait LapackGEQR: RCLike {
 }
 
 macro_rules! lapack_geqr {
-    ($t:ty, $tt:ty, $fun:expr) => {
+    ($t:ty, $lapack_type:ty, $fun:expr) => {
         impl LapackGEQR for $t {
             // fn geqr(
             //     m: i32,
             //     n: i32,
-            //     mat: &mut [Self],
+            //     a: &mut [Self],
             //     lda: i32,
             //     t: &mut [Self],
             //     tsize: i32,
@@ -453,35 +454,31 @@ macro_rules! lapack_geqr {
 
 lapack_geqr!(f64, f64, dgeqr_);
 lapack_geqr!(f32, f32, sgeqr_);
-lapack_geqr!(c64, __BindgenComplex<f64>, zgeqr_);
-lapack_geqr!(c32, __BindgenComplex<f32>, cgeqr_);
+lapack_geqr!(c64, LapackComplex<f64>, zgeqr_);
+lapack_geqr!(c32, LapackComplex<f32>, cgeqr_);
 
-pub trait LapackGEQRF: RCLike {
-    fn geqrf(m: i32, n: i32, mat: &mut [Self], lda: i32, t: &mut [Self]) -> i32;
+pub(crate) trait LapackGEQRF: RCLike {
+    fn geqrf(m: i32, n: i32, a: &mut [Self], lda: i32, t: &mut [Self]) -> i32;
 }
 
-pub trait LapackGEQRFP: RCLike {
-    fn geqrfp(m: i32, n: i32, mat: &mut [Self], lda: i32, t: &mut [Self]) -> i32;
-}
-
-fn from_rclike_to_usize<T: RCLike>(x: T) -> usize {
-    x.to_usize().unwrap()
+pub(crate) trait LapackGEQRFP: RCLike {
+    fn geqrfp(m: i32, n: i32, a: &mut [Self], lda: i32, t: &mut [Self]) -> i32;
 }
 
 macro_rules! lapack_geqrf {
-    ($trait:ident, $trait_fun:ident, $t:ty, $tt:ty, $ffi_fun:expr) => {
+    ($trait:ident, $trait_fun:ident, $t:ty, $lapack_type:ty, $lapack_fun:expr) => {
         impl $trait for $t {
-            fn $trait_fun(m: i32, n: i32, mat: &mut [Self], lda: i32, t: &mut [Self]) -> i32 {
+            fn $trait_fun(m: i32, n: i32, a: &mut [Self], lda: i32, t: &mut [Self]) -> i32 {
                 let mut info = 0;
                 let mut work = new_uninit_vec(1);
                 unsafe {
-                    $ffi_fun(
+                    $lapack_fun(
                         &m,
                         &n,
-                        mat.as_mut_ptr() as *mut $tt,
+                        a.as_mut_ptr() as *mut $lapack_type,
                         &lda,
-                        t.as_mut_ptr() as *mut $tt,
-                        work.as_mut_ptr() as *mut $tt,
+                        t.as_mut_ptr() as *mut $lapack_type,
+                        work.as_mut_ptr() as *mut $lapack_type,
                         &(-1),
                         &mut info,
                     );
@@ -489,17 +486,17 @@ macro_rules! lapack_geqrf {
                 if info != 0 {
                     panic!("Error in geqrf workspace query: {}", info);
                 }
-                let work0 = unsafe { *(&work[0] as *const $tt as *const $t) };
-                let lwork = from_rclike_to_usize(work0);
+                let work0: $t = unsafe { transmute(work[0]) };
+                let lwork = work0.to_usize().unwrap();
                 let mut work = new_uninit_vec(lwork);
                 unsafe {
-                    $ffi_fun(
+                    $lapack_fun(
                         &m,
                         &n,
-                        mat.as_mut_ptr() as *mut $tt,
+                        a.as_mut_ptr() as *mut $lapack_type,
                         &lda,
-                        t.as_mut_ptr() as *mut $tt,
-                        work.as_mut_ptr() as *mut $tt,
+                        t.as_mut_ptr() as *mut $lapack_type,
+                        work.as_mut_ptr() as *mut $lapack_type,
                         &(lwork as i32),
                         &mut info,
                     );
@@ -515,34 +512,34 @@ macro_rules! lapack_geqrf {
 
 lapack_geqrf!(LapackGEQRF, geqrf, f64, f64, dgeqrf_);
 lapack_geqrf!(LapackGEQRF, geqrf, f32, f32, sgeqrf_);
-lapack_geqrf!(LapackGEQRF, geqrf, c64, __BindgenComplex<f64>, zgeqrf_);
-lapack_geqrf!(LapackGEQRF, geqrf, c32, __BindgenComplex<f32>, cgeqrf_);
+lapack_geqrf!(LapackGEQRF, geqrf, c64, LapackComplex<f64>, zgeqrf_);
+lapack_geqrf!(LapackGEQRF, geqrf, c32, LapackComplex<f32>, cgeqrf_);
 
 // Same for geqrfp.
 lapack_geqrf!(LapackGEQRFP, geqrfp, f64, f64, dgeqrfp_);
 lapack_geqrf!(LapackGEQRFP, geqrfp, f32, f32, sgeqrfp_);
-lapack_geqrf!(LapackGEQRFP, geqrfp, c64, __BindgenComplex<f64>, zgeqrfp_);
-lapack_geqrf!(LapackGEQRFP, geqrfp, c32, __BindgenComplex<f32>, cgeqrfp_);
+lapack_geqrf!(LapackGEQRFP, geqrfp, c64, LapackComplex<f64>, zgeqrfp_);
+lapack_geqrf!(LapackGEQRFP, geqrfp, c32, LapackComplex<f32>, cgeqrfp_);
 
-pub trait LapackQfrom: RCLike {
+pub(crate) trait LapackQfrom: RCLike {
     fn qfrom(m: i32, n: i32, k: i32, a: &mut [Self], lda: i32, tau: &mut [Self]) -> i32;
 }
 
-macro_rules! Qfrom_r {
-    ($t:ty, $fun:expr) => {
+macro_rules! lapack_qfrom {
+    ($t:ty, $lapack_type:ty, $lapack_fun:expr) => {
         impl LapackQfrom for $t {
             fn qfrom(m: i32, n: i32, k: i32, a: &mut [Self], lda: i32, tau: &mut [Self]) -> i32 {
                 let mut info = 0;
                 let mut work = new_uninit_vec(1);
                 unsafe {
-                    $fun(
+                    $lapack_fun(
                         &m,
                         &n,
                         &k,
-                        a.as_mut_ptr() as *mut $t,
+                        a.as_mut_ptr() as *mut $lapack_type,
                         &lda,
-                        tau.as_mut_ptr() as *mut $t,
-                        work.as_mut_ptr() as *mut $t,
+                        tau.as_mut_ptr() as *mut $lapack_type,
+                        work.as_mut_ptr() as *mut $lapack_type,
                         &(-1),
                         &mut info,
                     );
@@ -550,17 +547,18 @@ macro_rules! Qfrom_r {
                 if info != 0 {
                     panic!("Error in qfrom workspace query: {}", info);
                 }
-                let lwork = work[0] as usize;
+                let work0: $t = unsafe { transmute(work[0]) };
+                let lwork = work0.to_usize().unwrap();
                 let mut work = new_uninit_vec(lwork);
                 unsafe {
-                    $fun(
+                    $lapack_fun(
                         &m,
                         &n,
                         &k,
-                        a.as_mut_ptr() as *mut $t,
+                        a.as_mut_ptr() as *mut $lapack_type,
                         &lda,
-                        tau.as_mut_ptr() as *mut $t,
-                        work.as_mut_ptr() as *mut $t,
+                        tau.as_mut_ptr() as *mut $lapack_type,
+                        work.as_mut_ptr() as *mut $lapack_type,
                         &(lwork as i32),
                         &mut info,
                     );
@@ -574,60 +572,12 @@ macro_rules! Qfrom_r {
     };
 }
 
-Qfrom_r!(f64, dorgqr_);
-Qfrom_r!(f32, sorgqr_);
+lapack_qfrom!(f64, f64, dorgqr_);
+lapack_qfrom!(f32, f32, sorgqr_);
+lapack_qfrom!(c64, LapackComplex<f64>, zungqr_);
+lapack_qfrom!(c32, LapackComplex<f32>, cungqr_);
 
-macro_rules! Qfrom_c {
-    ($t:ty, $fun:expr) => {
-        impl LapackQfrom for Complex<$t> {
-            fn qfrom(m: i32, n: i32, k: i32, a: &mut [Self], lda: i32, tau: &mut [Self]) -> i32 {
-                let mut info = 0;
-                let mut work = new_uninit_vec(1);
-                unsafe {
-                    $fun(
-                        &m,
-                        &n,
-                        &k,
-                        a.as_mut_ptr() as *mut __BindgenComplex<$t>,
-                        &lda,
-                        tau.as_mut_ptr() as *mut __BindgenComplex<$t>,
-                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
-                        &(-1),
-                        &mut info,
-                    );
-                }
-                if info != 0 {
-                    panic!("Error in qfrom workspace query: {}", info);
-                }
-                let lwork = (unsafe {
-                    *(&work[0] as *const __BindgenComplex<$t> as *const Complex<$t>)
-                })
-                .re as usize;
-                let mut work = new_uninit_vec(lwork);
-                unsafe {
-                    $fun(
-                        &m,
-                        &n,
-                        &k,
-                        a.as_mut_ptr() as *mut __BindgenComplex<$t>,
-                        &lda,
-                        tau.as_mut_ptr() as *mut __BindgenComplex<$t>,
-                        work.as_mut_ptr() as *mut __BindgenComplex<$t>,
-                        &(lwork as i32),
-                        &mut info,
-                    );
-                }
-                if info < 0 {
-                    panic!("Illegal value in qfrom argument: {}", -info);
-                }
-                info
-            }
-        }
-    };
-}
-
-Qfrom_c!(f64, zungqr_);
-Qfrom_c!(f32, cungqr_);
+pub(crate) trait LapackQmul: RCLike {}
 
 macro_rules! LapackElem {
     ( $( $t:ident ),* ) => {

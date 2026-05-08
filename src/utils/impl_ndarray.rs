@@ -1,6 +1,6 @@
 use ndarray::{ScalarOperand, prelude::*};
 
-use crate::utils::traits::{InnerProduct, Norm as VectorNorm, RCLike, Vector};
+use crate::utils::traits::{Adjoint, InnerProduct, Norm as VectorNorm, RCLike, Vector};
 
 impl<D, IxN> Vector for Array<D, IxN>
 where

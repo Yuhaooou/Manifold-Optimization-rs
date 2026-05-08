@@ -3,6 +3,8 @@ use std::fmt::Display;
 use ndarray::prelude::*;
 use num_traits::Float;
 
+use crate::utils::tools::has_nan;
+
 use super::lapack::*;
 
 pub mod unused {
@@ -136,6 +138,7 @@ impl SVDBackend {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SVDError {
     Unconverged,
+    NanValue,
 }
 
 /// Thin Svd for F-order matrixm. This funtion will destroy the input matrix.
@@ -147,6 +150,17 @@ fn thin_svd_owned_impl<T>(
 where
     T: LapackElem,
 {
+    let is_check_nan = false;
+
+    if is_check_nan && has_nan(&mat) {
+        return Err(SVDError::NanValue);
+    }
+
+    debug_assert!(
+        mat.t().is_standard_layout() || mat.is_standard_layout(),
+        "Input matrix must be contiguous."
+    );
+
     // For f-order mat, directly use lapack routines to compute. For c-order mat, we compute mat.t(), so m and n are reversed.
     let (m, n) = if order.is_f() {
         mat.dim()
@@ -259,8 +273,6 @@ where
     } else if mat.is_standard_layout() {
         thin_svd_owned_impl(mat, Layout::C, backend)
     } else {
-        // TODO
-        println!("== Untested: thin_svd_r_owned with owned non-contiguous Array. ==");
         let (u, s, vt) = thin_svd_owned_impl(mat.to_owned(), Layout::C, backend)?;
 
         debug_assert!(

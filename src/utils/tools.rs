@@ -52,3 +52,11 @@ where
     );
     (mat - &mat.t()) / D::from_i8(2).unwrap()
 }
+
+
+pub fn has_nan<D>(mat: &Array2<D>) -> bool
+where
+    D: RCLike,
+{
+    mat.iter().any(|x| x.is_nan())
+}
