@@ -252,3 +252,10 @@ pub trait InnerProduct {
 
 /// Convenience alias: a normed vector with inner product.
 pub trait InnerProductVector<K>: NormedVector<K> + InnerProduct<Field = K> {}
+
+pub trait Adjoint {
+    type Field: RCLike;
+
+    /// Return the adjoint of self.
+    fn adjoint(&self) -> Self;
+}

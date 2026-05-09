@@ -53,7 +53,7 @@ where
             "    grad_norm: {:.8e},\n",
             self.final_grad_norm.to_f64().unwrap()
         )?;
-        write!(f, "    iterations: {}.", self.iters)?;
+        write!(f, "    iterations: {}.\n", self.iters)?;
         write!(f, "    status: {}.", self.status)
     }
 }

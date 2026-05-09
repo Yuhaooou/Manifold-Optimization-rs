@@ -63,6 +63,15 @@ where
         self
     }
 
+    pub fn set_retraction_str(mut self, s: String) -> Self {
+        self.retraction_type = match s.to_lowercase().as_str() {
+            "qr" => StRetrType::QR,
+            "polar" => StRetrType::Polar,
+            _ => panic!("Invalid retraction type string: {s}"),
+        };
+        self
+    }
+
     fn retraction_qr(point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
         let (q, _) = (point + tangent_vector).qr_unique();
         q

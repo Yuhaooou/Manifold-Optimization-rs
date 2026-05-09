@@ -98,3 +98,15 @@ where
         (self * rhs.mapv(K::conj)).sum().re()
     }
 }
+
+impl<K, IxN> Adjoint for Array<K, IxN>
+where
+    K: RCLike,
+    IxN: Dimension,
+{
+    type Field = K;
+
+    fn adjoint(&self) -> Self {
+        self.mapv(K::conj)
+    }
+}
