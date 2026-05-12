@@ -97,7 +97,7 @@ where
     type AmbientPoint = Array2<D>;
     type Field = D;
 
-    fn base_point(&self) -> Self::Point {
+    fn base_point(&self) -> Array2<D> {
         let mut res = Array2::zeros((self.n, self.p));
         for i in 0..self.p {
             res[(i, i)] = D::one();
@@ -105,20 +105,20 @@ where
         res
     }
 
-    fn zero_tangent_vector(&self, _point: &Self::Point) -> Self::TangentVector {
+    fn zero_tangent_vector(&self, _point: &Array2<D>) -> Array2<D> {
         Array2::zeros((self.n, self.p))
     }
 
     fn inner(
         &self,
-        _point: &Self::Point,
+        _point: &Array2<D>,
         tangent_vector1: &Array2<D>,
         tangent_vector2: &Array2<D>,
     ) -> D::Real {
         tangent_vector1.inner(tangent_vector2)
     }
 
-    fn projection(&self, point: &Array2<D>, ambient_point: &Self::TangentVector) -> Self::Point {
+    fn projection(&self, point: &Array2<D>, ambient_point: &Array2<D>) -> Array2<D> {
         let tmp1 = (Array::eye(self.n) - point.dot(&point.t())).dot(ambient_point);
         let tmp2 = point.t().dot(ambient_point) - ambient_point.t().dot(point);
         tmp1 + point.dot(&tmp2) / D::from_i8(2).unwrap()
@@ -165,7 +165,7 @@ where
 {
     random_point_forward!(StandardNormal);
 
-    fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
+    fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Array2<D>
     where
         Dist: Distribution<D::Real>,
         R: Rng + ?Sized,

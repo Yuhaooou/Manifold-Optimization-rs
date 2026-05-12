@@ -577,7 +577,7 @@ lapack_qfrom!(f32, f32, sorgqr_);
 lapack_qfrom!(c64, LapackComplex<f64>, zungqr_);
 lapack_qfrom!(c32, LapackComplex<f32>, cungqr_);
 
-pub(crate) trait LapackQmul: RCLike {}
+// pub(crate) trait LapackQmul: RCLike {}
 
 macro_rules! LapackElem {
     ( $( $t:ident ),* ) => {

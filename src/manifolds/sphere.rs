@@ -53,17 +53,17 @@ where
     type TangentVector = Array1<D>;
     type AmbientPoint = Array1<D>;
 
-    fn base_point(&self) -> Self::Point {
+    fn base_point(&self) -> Array1<D> {
         let mut res = Array1::zeros(self.n);
         res[0] = D::one();
         res
     }
 
-    fn zero_tangent_vector(&self, _point: &Self::Point) -> Self::TangentVector {
+    fn zero_tangent_vector(&self, _point: &Array1<D>) -> Array1<D> {
         Array1::zeros(self.n)
     }
 
-    fn to_manifold(&self, ambient: &Self::AmbientPoint) -> Self::Point {
+    fn to_manifold(&self, ambient: &Array1<D>) -> Array1<D> {
         let norm = ambient.norm();
         if norm == D::zero() {
             println!("Warning: ambient point is zero vector, returning base point on the sphere");
@@ -75,9 +75,9 @@ where
 
     fn inner(
         &self,
-        _point: &Self::Point,
-        tangent_vector1: &Self::TangentVector,
-        tangent_vector2: &Self::TangentVector,
+        _point: &Array1<D>,
+        tangent_vector1: &Array1<D>,
+        tangent_vector2: &Array1<D>,
     ) -> D::Real {
         tangent_vector1.inner(tangent_vector2)
     }
@@ -107,11 +107,11 @@ where
 {
     fn ehess_to_rhess(
         &self,
-        point: &Self::Point,
-        tangent_vector: &Self::TangentVector,
-        egrad: &Self::AmbientPoint,
-        ehess: &Self::AmbientPoint,
-    ) -> Self::TangentVector {
+        point: &Array1<D>,
+        tangent_vector: &Array1<D>,
+        egrad: &Array1<D>,
+        ehess: &Array1<D>,
+    ) -> Array1<D> {
         self.projection(point, ehess) - tangent_vector * point.dot(egrad)
     }
 }
@@ -122,7 +122,7 @@ where
 {
     random_point_forward!(Uniform::new(-D::one(), D::one()).unwrap());
 
-    fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
+    fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Array1<D>
     where
         Dist: Distribution<Self::Field>,
         R: Rng + ?Sized,

@@ -52,28 +52,28 @@ where
     type AmbientPoint = Array2<D>;
     type Field = D;
 
-    fn base_point(&self) -> Self::Point {
+    fn base_point(&self) -> Array2<D> {
         todo!()
     }
 
-    fn zero_tangent_vector(&self, _point: &Self::Point) -> Self::TangentVector {
+    fn zero_tangent_vector(&self, _point: &Array2<D>) -> Array2<D> {
         todo!()
     }
 
     fn inner(
         &self,
-        _point: &Self::Point,
-        tangent_vector1: &Self::TangentVector,
-        tangent_vector2: &Self::TangentVector,
+        _point: &Array2<D>,
+        tangent_vector1: &Array2<D>,
+        tangent_vector2: &Array2<D>,
     ) -> D::Real {
         tangent_vector1.inner(tangent_vector2)
     }
 
-    fn projection(&self, point: &Self::Point, ambient: &Self::AmbientPoint) -> Self::TangentVector {
+    fn projection(&self, point: &Array2<D>, ambient: &Array2<D>) -> Array2<D> {
         ambient - point.dot(&point.t().dot(ambient))
     }
 
-    fn retraction(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
+    fn retraction(&self, point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
         let (u, _, vt) = (point + tangent_vector).into_svd();
         u.dot(&vt)
     }
@@ -83,11 +83,7 @@ impl<D> EGradToRGrad for Grassmann<D>
 where
     D: RCLike + ScalarOperand + LapackElem,
 {
-    fn egrad_to_rgrad(
-        &self,
-        point: &Self::Point,
-        egrad: &Self::AmbientPoint,
-    ) -> Self::TangentVector {
+    fn egrad_to_rgrad(&self, point: &Array2<D>, egrad: &Array2<D>) -> Array2<D> {
         self.projection(point, egrad)
     }
 }
@@ -98,11 +94,11 @@ where
 {
     fn ehess_to_rhess(
         &self,
-        point: &Self::Point,
-        tangent_vector: &Self::TangentVector,
-        egrad: &Self::AmbientPoint,
-        ehess: &Self::AmbientPoint,
-    ) -> Self::TangentVector {
+        point: &Array2<D>,
+        tangent_vector: &Array2<D>,
+        egrad: &Array2<D>,
+        ehess: &Array2<D>,
+    ) -> Array2<D> {
         let projected_hess = self.projection(point, ehess);
         let xtg = point.t().dot(egrad);
         projected_hess - tangent_vector.dot(&xtg)
@@ -116,7 +112,7 @@ where
 {
     random_point_forward!(StandardNormal);
 
-    fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Self::Point
+    fn random_point_impl<Dist, R>(&self, dist: Dist, rng: &mut R) -> Array2<D>
     where
         Dist: Distribution<D::Real>,
         R: Rng + ?Sized,
@@ -131,7 +127,7 @@ impl<D> Exp for Grassmann<D>
 where
     D: RCLike + ScalarOperand + LapackElem,
 {
-    fn exp(&self, point: &Self::Point, tangent_vector: &Self::TangentVector) -> Self::Point {
+    fn exp(&self, point: &Array2<D>, tangent_vector: &Array2<D>) -> Array2<D> {
         let (u, s, vt) = tangent_vector.svd(false);
         let s = s.map(|x| D::from(*x).unwrap());
         let cos_s = Array::from_diag(&s.mapv(<D as ComplexFloat>::cos));

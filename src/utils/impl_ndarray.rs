@@ -9,10 +9,6 @@ where
 {
     type Field = D;
 
-    fn sum(&self) -> Self::Field {
-        ArrayRef::<D, IxN>::sum(self)
-    }
-
     fn ref_add_num(&self, num: Self::Field) -> Self {
         self + num
     }
