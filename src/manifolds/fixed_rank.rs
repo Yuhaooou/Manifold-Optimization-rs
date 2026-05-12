@@ -1,6 +1,6 @@
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
-use ndarray::{concatenate, prelude::*, ScalarOperand};
+use ndarray::{ScalarOperand, concatenate, prelude::*};
 use ndarray_rand::RandomExt;
 use rand::Rng;
 use rand_distr::{Distribution, StandardNormal};
