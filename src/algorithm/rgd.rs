@@ -67,7 +67,7 @@ where
 {
     /// Create an RGD solver with default stopping parameters.
     pub fn new(
-        problem: &'a mut Problem<'b, M, F, G, H>,
+        problem: &'a Problem<'b, M, F, G, H>,
         linesearch_params: &'a BackTrackingParams<R>,
     ) -> Self {
         Self {

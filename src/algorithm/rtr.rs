@@ -76,7 +76,7 @@ where
     G: Fn(&M::Point) -> M::TangentVector,
     H: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
 {
-    pub fn new(problem: &'a mut Problem<'b, M, F, G, H>, max_radius: R, threshold: R) -> Self {
+    pub fn new(problem: &'a Problem<'b, M, F, G, H>, max_radius: R, threshold: R) -> Self {
         RTR {
             problem,
             min_grad_norm: R::from_f64(DEFAULT_MIN_GRAD_NORM).unwrap(),

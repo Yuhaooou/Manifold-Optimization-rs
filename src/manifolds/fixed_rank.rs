@@ -88,7 +88,7 @@ where
         let (qu, ru) = uup.into_qr();
         let vvp = concatenate![Axis(1), point.v, tangent_vector.vp];
         let (qv, rv) = vvp.into_qr();
-        let (svdu, svds, svdvt) = {
+        let (svdu, svds, svdv) = {
             let tmp = &tangent_vector.m + Array2::from_diag(&point.s);
             let tmp = concatenate![Axis(1), tmp, Array2::eye(self.r)];
             let tmp2 = concatenate![
@@ -102,14 +102,14 @@ where
                 // TOOD: Directly use truncated SVD.
                 tmpsvd.0.slice(s![.., ..self.r]).to_owned(),
                 tmpsvd.1.slice(s![..self.r]).to_owned(),
-                tmpsvd.2.slice(s![.., ..self.r]).t().to_owned(),
+                tmpsvd.2.slice(s![..self.r, ..]).t().to_owned(),
             )
         };
 
         Self::Point::new(
             qu.dot(&svdu),
             svds.mapv(RCLike::from_real),
-            qv.dot(&svdvt.t()),
+            qv.dot(&svdv),
         )
     }
 
@@ -118,8 +118,9 @@ where
         point: &Self::Point,
         ambient_vector: &Self::AmbientPoint,
     ) -> Self::TangentVector {
-        let m = point.u.t().dot(ambient_vector).dot(&point.v);
-        let up = ambient_vector.dot(&point.v) - point.u.dot(&m);
+        let tmp1 = ambient_vector.dot(&point.v);
+        let m = point.u.t().dot(&tmp1);
+        let up = tmp1 - point.u.dot(&m);
         let vp = ambient_vector.t().dot(&point.u) - point.v.dot(&m.t());
         TangentVector { up, m, vp }
     }
@@ -180,9 +181,10 @@ where
         R: Rng + ?Sized,
     {
         let u = Array2::random_using((self.m, self.r), &dist, rng).mapv(D::from_real);
-        let s = Array1::random_using(self.r, &dist, rng).mapv(D::from_real);
         let v = Array2::random_using((self.n, self.r), &dist, rng).mapv(D::from_real);
-        Self::Point { u, s, v }
+
+        let full = u.dot(&v.t());
+        Self::Point::new_from_full(&full, self.r)
     }
 }
 
@@ -198,11 +200,35 @@ impl<D> Point<D> {
         Point { u, s, v }
     }
 
+    pub fn u(&self) -> &Array2<D> {
+        &self.u
+    }
+
+    pub fn s(&self) -> &Array1<D> {
+        &self.s
+    }
+
+    pub fn v(&self) -> &Array2<D> {
+        &self.v
+    }
+
     pub fn full(&self) -> Array2<D>
     where
         D: RCLike + ScalarOperand,
     {
         (&self.u * &self.s).dot(&self.v.t())
+    }
+
+    pub fn new_from_full(full: &Array2<D>, r: usize) -> Self
+    where
+        D: RCLike + ScalarOperand + LapackElem,
+    {
+        let (u, s, v) = full.svd(false);
+        Point::new(
+            u.slice(s![.., ..r]).to_owned(),
+            s.slice(s![..r]).to_owned().mapv(RCLike::from_real),
+            v.slice(s![.., ..r]).to_owned(),
+        )
     }
 }
 
@@ -226,6 +252,18 @@ pub struct TangentVector<D> {
 impl<D> TangentVector<D> {
     pub fn new(up: Array2<D>, m: Array2<D>, vp: Array2<D>) -> Self {
         TangentVector { up, m, vp }
+    }
+
+    pub fn up(&self) -> &Array2<D> {
+        &self.up
+    }
+
+    pub fn m(&self) -> &Array2<D> {
+        &self.m
+    }
+
+    pub fn vp(&self) -> &Array2<D> {
+        &self.vp
     }
 
     pub fn full(&self, point: &Point<D>) -> Array2<D>
