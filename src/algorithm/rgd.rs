@@ -1,26 +1,25 @@
 use crate::algorithm::Status;
 use crate::algorithm::line_search::{BackTrackingParams, back_tracking};
 use crate::manifolds::Manifold;
-use crate::problem::Problem;
-use crate::utils::traits::Real;
+use crate::problem::{FuncOne, Problem};
+use crate::utils::traits::{Real, Vector};
 
 const DEFAULT_MIN_GRAD_NORM: f64 = 1e-8;
 const DEFAULT_MIN_STEP_SIZE: f64 = 1e-12;
 const DEFAULT_MAX_ITERATIONS: usize = 1000;
 
 /// Riemannian Gradient Descent solver.
-pub struct RGD<'a, 'b, R, M, F, G, H>
+pub struct RGD<R, M, F>
 where
     R: Real,
     M: Manifold,
-    F: Fn(&M::Point) -> M::Field,
-    G: Fn(&M::Point) -> M::TangentVector,
+    F: FuncOne<Manifold = M>,
 {
-    problem: &'a Problem<'b, M, F, G, H>,
+    problem: Problem<M, F>,
     min_grad_norm: R,
     min_step_size: R,
     max_iterations: usize,
-    back_tracking_params: &'a BackTrackingParams<R>,
+    back_tracking_params: BackTrackingParams<R>,
     verbose: u8,
 }
 
@@ -58,18 +57,14 @@ where
     }
 }
 
-impl<'a, 'b, R, M, F, G, H> RGD<'a, 'b, R, M, F, G, H>
+impl<R, M, F> RGD<R, M, F>
 where
     R: Real,
     M: Manifold<Field = R>,
-    F: Fn(&M::Point) -> M::Field,
-    G: Fn(&M::Point) -> M::TangentVector,
+    F: FuncOne<Manifold = M>,
 {
     /// Create an RGD solver with default stopping parameters.
-    pub fn new(
-        problem: &'a Problem<'b, M, F, G, H>,
-        linesearch_params: &'a BackTrackingParams<R>,
-    ) -> Self {
+    pub fn new(problem: Problem<M, F>, linesearch_params: BackTrackingParams<R>) -> Self {
         Self {
             problem,
             min_grad_norm: R::from_f64(DEFAULT_MIN_GRAD_NORM).unwrap(),
@@ -78,6 +73,10 @@ where
             back_tracking_params: linesearch_params,
             verbose: 1,
         }
+    }
+
+    pub fn problem_move(self) -> Problem<M, F>{
+        self.problem
     }
 
     /// Set minimum gradient norm stopping threshold.
@@ -126,7 +125,7 @@ where
                 &self.problem,
                 &current_point,
                 current_value,
-                &-grad,
+                &grad.ref_neg(),
                 grad_norm.powi_(2),
                 &self.back_tracking_params,
             );

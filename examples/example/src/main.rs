@@ -1,6 +1,6 @@
 use manifold_optimization::algorithm::{BackTrackingParams, RGD, RTR};
 use manifold_optimization::manifolds::*;
-use manifold_optimization::problem::Problem;
+use manifold_optimization::problem::{FuncGradHess, Problem};
 use manifold_optimization::utils::traits::InnerProduct;
 use ndarray::prelude::*;
 use ndarray_rand::RandomExt;
@@ -18,8 +18,26 @@ pub fn main() {
 
     let manifold = Stiefel::new(n, r);
 
-    let mut problem = Problem::new_with_rng(&manifold, |x| 0.5 * x.inner(&mat.dot(x)), &mut rng)
-        .with_egrad_ehess(|x| mat.dot(x), |_, v| mat.dot(v));
+    let func = FuncGradHess::new(manifold.clone(), {
+        move |x: &Array2<f64>, v: Option<&Array2<f64>>, c1, c2, c3| {
+            let ax = mat.dot(x);
+            let cost = if c1 { Some(0.5 * x.inner(&ax)) } else { None };
+            let grad = if c2 {
+                Some(manifold.egrad_to_rgrad(x, &ax))
+            } else {
+                None
+            };
+            let hess = if c3 {
+                let v = v.unwrap();
+                Some(manifold.ehess_to_rhess(x, v, &ax, &mat.dot(v)))
+            } else {
+                None
+            };
+            (cost, grad, hess)
+        }
+    });
+
+    let problem = Problem::new_with_rng(func, &mut rng);
 
     // ==========================RGD=============================================
 
@@ -27,7 +45,7 @@ pub fn main() {
     let start_time = std::time::Instant::now();
 
     let linesearch_params = BackTrackingParams::new(0.5, 0.8);
-    let mut rgd = RGD::new(&mut problem, &linesearch_params)
+    let mut rgd = RGD::new(problem, linesearch_params)
         .set_verbose(1)
         .set_max_iterations(1000)
         .set_min_grad_norm(1e-6)
@@ -45,7 +63,7 @@ pub fn main() {
     println!("\n{:=^80}", "RTR");
     let start_time = std::time::Instant::now();
 
-    let mut rtr = RTR::new(&mut problem, 10.0, 0.1)
+    let mut rtr = RTR::new(rgd.problem_move(), 10.0, 0.1)
         .set_max_iterations(1000)
         .set_verbose(0)
         .set_min_grad_norm(1e-6)

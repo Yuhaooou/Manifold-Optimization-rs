@@ -179,6 +179,8 @@ pub trait Vector:
 
     fn ref_sub(&self, rhs: Self) -> Self;
 
+    fn ref_neg(&self) -> Self;
+
     fn ref_add_ref(&self, rhs: &Self) -> Self;
 
     fn ref_sub_ref(&self, rhs: &Self) -> Self;

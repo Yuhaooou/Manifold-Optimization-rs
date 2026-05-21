@@ -2,7 +2,7 @@ use derive_new::new;
 
 use crate::algorithm::Status;
 use crate::manifolds::Manifold;
-use crate::problem::Problem;
+use crate::problem::{FuncTwo, Problem};
 use crate::utils::traits::{Real, Vector};
 
 const DEFAULT_MIN_GRAD_NORM: f64 = 1e-6;
@@ -13,15 +13,13 @@ const DEFAULT_THETA: f64 = 1.0;
 const DEFAULT_MAX_INNER_ITERATIONS: usize = 500;
 
 /// Riemannian Trust-Region solver.
-pub struct RTR<'a, 'b, R, M, F, G, H>
+pub struct RTR<R, M, F>
 where
     R: Real,
     M: Manifold,
-    F: Fn(&M::Point) -> M::Field,
-    G: Fn(&M::Point) -> M::TangentVector,
-    H: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
+    F: FuncTwo<Manifold = M>,
 {
-    problem: &'a Problem<'b, M, F, G, H>,
+    problem: Problem<M, F>,
     min_grad_norm: R,
     min_step_size: R,
     max_iterations: usize,
@@ -68,15 +66,13 @@ where
     }
 }
 
-impl<'a, 'b, R, M, F, G, H> RTR<'a, 'b, R, M, F, G, H>
+impl<R, M, F> RTR<R, M, F>
 where
     R: Real,
     M: Manifold<Field = R>,
-    F: Fn(&M::Point) -> M::Field,
-    G: Fn(&M::Point) -> M::TangentVector,
-    H: Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
+    F: FuncTwo<Manifold = M>,
 {
-    pub fn new(problem: &'a Problem<'b, M, F, G, H>, max_radius: R, threshold: R) -> Self {
+    pub fn new(problem: Problem<M, F>, max_radius: R, threshold: R) -> Self {
         RTR {
             problem,
             min_grad_norm: R::from_f64(DEFAULT_MIN_GRAD_NORM).unwrap(),

@@ -33,6 +33,10 @@ where
         self - rhs
     }
 
+    fn ref_neg(&self) -> Self {
+        -self.clone()
+    }
+
     fn ref_add_ref(&self, rhs: &Self) -> Self {
         self + rhs
     }

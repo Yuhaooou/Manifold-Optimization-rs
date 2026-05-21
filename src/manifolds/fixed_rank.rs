@@ -106,11 +106,7 @@ where
             )
         };
 
-        Self::Point::new(
-            qu.dot(&svdu),
-            svds.mapv(RCLike::from_real),
-            qv.dot(&svdv),
-        )
+        Self::Point::new(qu.dot(&svdu), svds.mapv(RCLike::from_real), qv.dot(&svdv))
     }
 
     fn projection(
@@ -210,6 +206,10 @@ impl<D> Point<D> {
 
     pub fn v(&self) -> &Array2<D> {
         &self.v
+    }
+
+    pub fn vt<'a>(&'a self) -> ArrayView2<'a, D> {
+        self.v.t()
     }
 
     pub fn full(&self) -> Array2<D>
@@ -377,6 +377,10 @@ where
 
     fn ref_sub(&self, rhs: Self) -> Self {
         Self::new(&self.up - rhs.up, &self.m - rhs.m, &self.vp - rhs.vp)
+    }
+
+    fn ref_neg(&self) -> Self {
+        Self::new(-self.up.clone(), -self.m.clone(), -self.vp.clone())
     }
 
     fn ref_add_ref(&self, rhs: &Self) -> Self {
