@@ -1,0 +1,10 @@
+[package]
+name = "rank"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+manifold-optimization = { path = "../.." }
+ndarray = "0.17.2"
+ndarray-rand = "0.16.0"
+rand = "0.9"
