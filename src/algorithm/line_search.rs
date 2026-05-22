@@ -1,5 +1,6 @@
+use crate::function::FuncZero;
 use crate::manifolds::Manifold;
-use crate::problem::{FuncZero, Problem};
+use crate::problem::Problem;
 use crate::utils::traits::{Real, Vector};
 
 /// Parameters for Armijo backtracking line search.
@@ -106,7 +107,7 @@ where
     let mut next_point = problem.retraction(point, &direction.ref_mul_num(alpha));
 
     for _ in 1..=params.max_iters {
-        let lhs = value - problem.function(&next_point);
+        let lhs = value - problem.compute_value(&next_point);
         let rhs = r * alpha * covalue;
         if lhs >= rhs || alpha < params.min_alpha {
             return (alpha, next_point, LineSearchStatus::Success);

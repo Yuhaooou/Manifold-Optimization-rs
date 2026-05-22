@@ -1,6 +1,7 @@
 use manifold_optimization::algorithm::{BackTrackingParams, RGD, RTR};
+use manifold_optimization::function::FuncGradHess;
 use manifold_optimization::manifolds::*;
-use manifold_optimization::problem::{FuncGradHess, Problem};
+use manifold_optimization::problem::Problem;
 use manifold_optimization::utils::traits::InnerProduct;
 use ndarray::prelude::*;
 use ndarray_rand::RandomExt;

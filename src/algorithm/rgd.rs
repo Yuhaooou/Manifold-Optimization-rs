@@ -1,7 +1,8 @@
 use crate::algorithm::Status;
 use crate::algorithm::line_search::{BackTrackingParams, back_tracking};
+use crate::function::FuncOne;
 use crate::manifolds::Manifold;
-use crate::problem::{FuncOne, Problem};
+use crate::problem::Problem;
 use crate::utils::traits::{Real, Vector};
 
 const DEFAULT_MIN_GRAD_NORM: f64 = 1e-8;
@@ -75,7 +76,7 @@ where
         }
     }
 
-    pub fn problem_move(self) -> Problem<M, F>{
+    pub fn problem_move(self) -> Problem<M, F> {
         self.problem
     }
 
@@ -105,15 +106,18 @@ where
 
     /// Run optimization until one stopping criterion is met.
     pub fn run(&mut self) -> RGDResult<R, M> {
-        let mut current_point = self.problem.get_initial_point().clone();
-        let mut current_value = self.problem.function(&current_point);
-        let mut grad = self.problem.gradient(&current_point);
-        let mut grad_norm = self.problem.norm(&current_point, &grad);
+        let point = self.problem.get_initial_point().clone();
+
+        self.problem.update_value_and_gradient(point);
+
+        let mut grad_norm = self
+            .problem
+            .norm(self.problem.get_point(), self.problem.get_gradient());
 
         if grad_norm < self.min_grad_norm {
             return RGDResult {
-                final_value: self.problem.function(&current_point),
-                point: current_point,
+                final_value: self.problem.get_value(),
+                point: self.problem.return_point(),
                 final_grad_norm: grad_norm,
                 iters: 0,
                 status: Status::MinGradientNorm,
@@ -123,21 +127,23 @@ where
         for iter in 1..=self.max_iterations {
             let (alpha, next_point, _) = back_tracking(
                 &self.problem,
-                &current_point,
-                current_value,
-                &grad.ref_neg(),
+                self.problem.get_point(),
+                self.problem.get_value(),
+                &self.problem.get_gradient().ref_neg(),
                 grad_norm.powi_(2),
                 &self.back_tracking_params,
             );
 
-            grad = self.problem.gradient(&next_point);
-            grad_norm = self.problem.norm(&next_point, &grad);
-            let next_value = self.problem.function(&next_point);
+            self.problem.update_value_and_gradient(next_point);
+
+            grad_norm = self
+                .problem
+                .norm(self.problem.get_point(), self.problem.get_gradient());
 
             if alpha < self.min_step_size {
                 return RGDResult {
-                    final_value: next_value,
-                    point: next_point,
+                    final_value: self.problem.get_value(),
+                    point: self.problem.return_point(),
                     final_grad_norm: grad_norm,
                     iters: iter,
                     status: Status::MinStepSize,
@@ -146,8 +152,8 @@ where
 
             if grad_norm < self.min_grad_norm {
                 return RGDResult {
-                    final_value: next_value,
-                    point: next_point,
+                    final_value: self.problem.get_value(),
+                    point: self.problem.return_point(),
                     final_grad_norm: grad_norm,
                     iters: iter,
                     status: Status::MinGradientNorm,
@@ -158,19 +164,16 @@ where
                 println!(
                     "Iter: {}, Cost: {:.8e}, Grad Norm: {:.8e}, Step Size: {:.8e}",
                     iter,
-                    next_value.to_f64().unwrap(),
+                    self.problem.get_value().to_f64().unwrap(),
                     grad_norm.to_f64().unwrap(),
                     alpha.to_f64().unwrap()
                 );
             }
-
-            current_point = next_point;
-            current_value = next_value;
         }
 
         RGDResult {
-            point: current_point,
-            final_value: current_value,
+            final_value: self.problem.get_value(),
+            point: self.problem.return_point(),
             final_grad_norm: grad_norm,
             iters: self.max_iterations,
             status: Status::MaxIters,

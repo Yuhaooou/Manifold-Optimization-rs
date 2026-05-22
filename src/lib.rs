@@ -7,6 +7,7 @@
 //! - Shared numeric/vector utilities in the `utils` module.
 
 pub mod algorithm;
+pub mod function;
 pub mod linalg;
 pub mod manifolds;
 pub mod problem;
