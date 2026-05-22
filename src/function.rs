@@ -353,17 +353,6 @@ where
 pub struct FuncGradHess<M, F>
 where
     M: Manifold,
-    F: Fn(
-        &M::Point,
-        Option<&M::TangentVector>,
-        bool,
-        bool,
-        bool,
-    ) -> (
-        Option<M::Field>,
-        Option<M::TangentVector>,
-        Option<M::TangentVector>,
-    ),
 {
     manifold: M,
     fun_with_grad_hess: F,
@@ -455,21 +444,70 @@ where
     }
 }
 
-impl<M, F> FuncGradHess<M, F>
+impl<M> FuncGradHess<M, ()>
 where
     M: Manifold + EGradToRGrad + EHessToRHess,
-    F: Fn(
-        &M::Point,
-        Option<&M::TangentVector>,
-        bool,
-        bool,
-        bool,
-    ) -> (
-        Option<M::Field>,
-        Option<M::TangentVector>,
-        Option<M::TangentVector>,
-    ),
 {
+    pub fn new_from_ambient<F1>(
+        manifold: M,
+        fun_with_egrad_ehess: F1,
+    ) -> FuncGradHess<
+        M,
+        impl Fn(
+            &M::Point,
+            Option<&M::TangentVector>,
+            bool,
+            bool,
+            bool,
+        ) -> (
+            Option<M::Field>,
+            Option<M::TangentVector>,
+            Option<M::TangentVector>,
+        ),
+    >
+    where
+        F1: Fn(
+            &M::Point,
+            Option<&M::TangentVector>,
+            bool,
+            bool,
+            bool,
+        ) -> (
+            Option<M::Field>,
+            Option<M::AmbientPoint>,
+            Option<M::AmbientPoint>,
+        ),
+    {
+        let manifold_ = manifold.clone();
+        let fun_with_grad_hess =
+            move |x: &M::Point, v: Option<&M::TangentVector>, cv: bool, cg: bool, ch: bool| {
+                let cg = cg || ch;
+                let (cost, egrad, ehess) = fun_with_egrad_ehess(x, v, cv, cg, ch);
+
+                let grad = if cg {
+                    Some(manifold_.egrad_to_rgrad(x, egrad.as_ref().unwrap()))
+                } else {
+                    None
+                };
+                let hess = if ch {
+                    Some(manifold_.ehess_to_rhess(x, v.unwrap(), &egrad.unwrap(), &ehess.unwrap()))
+                } else {
+                    None
+                };
+                (cost, grad, hess)
+            };
+
+        FuncGradHess {
+            manifold,
+            fun_with_grad_hess,
+            current_point: None,
+            current_tangent_vector: None,
+            current_value: None,
+            current_grad: None,
+            current_hess: None,
+        }
+    }
+
     pub fn new_with_fun_egrad_ehess<Fun, Grad, Hess>(
         manifold: M,
         function: impl Fn(&M::Point) -> M::Field,
@@ -492,23 +530,19 @@ where
         let manifold_ = manifold.clone();
         let fun_with_grad_hess = move |x: &M::Point,
                                        v: Option<&M::TangentVector>,
-                                       compute_cost: bool,
-                                       compute_grad: bool,
-                                       compute_hess: bool| {
-            let value = if compute_cost {
-                Some(function(x))
-            } else {
-                None
-            };
+                                       cv: bool,
+                                       cg: bool,
+                                       ch: bool| {
+            let value = if cv { Some(function(x)) } else { None };
 
-            let (grad, hess) = if compute_grad || compute_hess {
+            let (grad, hess) = if cg || ch {
                 let egrad = egradient(x);
-                let grad = if compute_grad {
+                let grad = if cg {
                     Some(manifold_.egrad_to_rgrad(x, &egrad))
                 } else {
                     None
                 };
-                let hess = if compute_hess {
+                let hess = if ch {
                     Some(manifold_.ehess_to_rhess(x, v.unwrap(), &egrad, &ehessian(x, v.unwrap())))
                 } else {
                     None

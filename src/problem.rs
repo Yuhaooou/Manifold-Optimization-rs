@@ -111,28 +111,33 @@ where
     F: FuncZero<Manifold = M>,
 {
     /// Norm induced by manifold metric.
-    pub fn norm(&self, x: &M::Point, v: &M::TangentVector) -> <M::Field as ComplexFloat>::Real {
-        self.function.manifold().norm(x, v)
+    pub fn norm(&self, v: &M::TangentVector) -> <M::Field as ComplexFloat>::Real {
+        self.function.manifold().norm(self.function.get_point(), v)
     }
 
     /// Manifold inner product of tangent vectors.
     pub fn inner(
         &self,
-        x: &M::Point,
         v1: &M::TangentVector,
         v2: &M::TangentVector,
     ) -> <M::Field as ComplexFloat>::Real {
-        self.function.manifold().inner(x, v1, v2)
+        self.function
+            .manifold()
+            .inner(self.function.get_point(), v1, v2)
     }
 
     /// Retract a tangent vector back to the manifold.
-    pub fn retraction(&self, x: &M::Point, v: &M::TangentVector) -> M::Point {
-        self.function.manifold().retraction(x, v)
+    pub fn retraction(&self, v: &M::TangentVector) -> M::Point {
+        self.function
+            .manifold()
+            .retraction(self.function.get_point(), v)
     }
 
     /// Project an ambient vector to tangent space.
-    pub fn projection(&self, x: &M::Point, v: &M::AmbientPoint) -> M::TangentVector {
-        self.function.manifold().projection(x, v)
+    pub fn projection(&self, v: &M::AmbientPoint) -> M::TangentVector {
+        self.function
+            .manifold()
+            .projection(self.function.get_point(), v)
     }
 
     pub fn compute_value(&self, x: &M::Point) -> M::Field {
@@ -175,8 +180,8 @@ where
     M: Manifold + Exp,
     F: FuncZero<Manifold = M>,
 {
-    pub fn exp(&self, x: &M::Point, v: &M::TangentVector) -> M::Point {
-        self.function.manifold().exp(x, v)
+    pub fn exp(&self, v: &M::TangentVector) -> M::Point {
+        self.function.manifold().exp(self.function.get_point(), v)
     }
 }
 
@@ -185,8 +190,8 @@ where
     M: Manifold + Log,
     F: FuncZero<Manifold = M>,
 {
-    pub fn log(&self, x: &M::Point, y: &M::Point) -> M::TangentVector {
-        self.function.manifold().log(x, y)
+    pub fn log(&self, y: &M::Point) -> M::TangentVector {
+        self.function.manifold().log(self.function.get_point(), y)
     }
 }
 
@@ -195,7 +200,9 @@ where
     M: Manifold + Transport,
     F: FuncZero<Manifold = M>,
 {
-    pub fn transport(&self, x: &M::Point, y: &M::Point, v: &M::TangentVector) -> M::TangentVector {
-        self.function.manifold().transport(x, y, v)
+    pub fn transport(&self, y: &M::Point, v: &M::TangentVector) -> M::TangentVector {
+        self.function
+            .manifold()
+            .transport(self.function.get_point(), y, v)
     }
 }

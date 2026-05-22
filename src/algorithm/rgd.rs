@@ -110,9 +110,7 @@ where
 
         self.problem.update_value_and_gradient(point);
 
-        let mut grad_norm = self
-            .problem
-            .norm(self.problem.get_point(), self.problem.get_gradient());
+        let mut grad_norm = self.problem.norm(self.problem.get_gradient());
 
         if grad_norm < self.min_grad_norm {
             return RGDResult {
@@ -136,9 +134,7 @@ where
 
             self.problem.update_value_and_gradient(next_point);
 
-            grad_norm = self
-                .problem
-                .norm(self.problem.get_point(), self.problem.get_gradient());
+            grad_norm = self.problem.norm(self.problem.get_gradient());
 
             if alpha < self.min_step_size {
                 return RGDResult {

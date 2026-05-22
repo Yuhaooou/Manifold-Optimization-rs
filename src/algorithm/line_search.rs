@@ -89,7 +89,7 @@ pub enum LineSearchStatus {
 /// `covalue` is the directional derivative at `point` along `direction`.
 pub fn back_tracking<R, M, F>(
     problem: &Problem<M, F>,
-    point: &M::Point,
+    _point: &M::Point,
     value: R,
     direction: &M::TangentVector,
     covalue: R,
@@ -104,7 +104,7 @@ where
     let tau = params.tau;
     let r = params.r;
 
-    let mut next_point = problem.retraction(point, &direction.ref_mul_num(alpha));
+    let mut next_point = problem.retraction(&direction.ref_mul_num(alpha));
 
     for _ in 1..=params.max_iters {
         let lhs = value - problem.compute_value(&next_point);
@@ -113,7 +113,7 @@ where
             return (alpha, next_point, LineSearchStatus::Success);
         }
         alpha *= tau;
-        next_point = problem.retraction(point, &direction.ref_mul_num(alpha));
+        next_point = problem.retraction(&direction.ref_mul_num(alpha));
     }
 
     (alpha, next_point, LineSearchStatus::MaxIters)

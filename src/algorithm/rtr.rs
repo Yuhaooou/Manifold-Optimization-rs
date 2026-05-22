@@ -140,28 +140,28 @@ where
         let mut v = b.zeros_like();
         let mut r = b.clone();
         let mut p = r.clone();
-        if self.problem.norm(point, &r) == R::zero() {
+        if self.problem.norm(&r) == R::zero() {
             return (v, R::zero(), Some(0));
         }
 
         let subproblem_func = |s| {
             let hs = self.problem.function().directly_get_hessian(point, s);
-            R::half() * self.problem.inner(point, s, &hs) - self.problem.inner(point, b, s)
+            R::half() * self.problem.inner(s, &hs) - self.problem.inner(b, s)
         };
 
-        let b_norm = self.problem.norm(point, b);
+        let b_norm = self.problem.norm(b);
         let r_bound = b_norm * R::min(self.kappa, b_norm.powf_(self.theta));
 
         for iter in 1..=self.max_inner_iterations {
             let hp = self.problem.function().directly_get_hessian(point, &p);
-            let p_hp = self.problem.inner(point, &p, &hp);
-            let alpha = self.problem.norm(point, &r).powi_(2) / p_hp;
+            let p_hp = self.problem.inner(&p, &hp);
+            let alpha = self.problem.norm(&r).powi_(2) / p_hp;
             let v_next = v.ref_add(p.ref_mul_num(alpha));
 
-            if p_hp <= R::zero() || self.problem.norm(point, &v_next) >= radius {
-                let inner_v_p = self.problem.inner(point, &v, &p);
-                let norm_p_sq = self.problem.norm(point, &p).powi_(2);
-                let norm_v_sq = self.problem.norm(point, &v).powi_(2);
+            if p_hp <= R::zero() || self.problem.norm(&v_next) >= radius {
+                let inner_v_p = self.problem.inner(&v, &p);
+                let norm_p_sq = self.problem.norm(&p).powi_(2);
+                let norm_v_sq = self.problem.norm(&v).powi_(2);
                 let tmp = norm_p_sq * (norm_v_sq - radius.powi_(2)).muli(4);
                 let t = (-inner_v_p + (inner_v_p.powi_(2) - tmp).sqrt_()) / norm_p_sq;
 
@@ -171,13 +171,12 @@ where
             }
             v = v_next;
             let r_next = r.ref_sub(hp.ref_mul_num(alpha));
-            if self.problem.norm(point, &r_next) < r_bound {
+            if self.problem.norm(&r_next) < r_bound {
                 let subproblem_value = subproblem_func(&v);
                 return (v, subproblem_value, Some(iter));
             }
 
-            let beta =
-                self.problem.norm(point, &r_next).powi_(2) / self.problem.norm(point, &r).powi_(2);
+            let beta = self.problem.norm(&r_next).powi_(2) / self.problem.norm(&r).powi_(2);
             p = r_next.ref_add(p * beta);
             r = r_next;
         }
@@ -192,9 +191,7 @@ where
 
         self.problem.update_value_and_gradient(init_point);
 
-        let mut grad_norm = self
-            .problem
-            .norm(self.problem.get_point(), self.problem.get_gradient());
+        let mut grad_norm = self.problem.norm(self.problem.get_gradient());
 
         if grad_norm < self.min_grad_norm {
             let value = self.problem.get_value();
@@ -213,14 +210,17 @@ where
                 &self.problem.get_gradient().ref_neg(),
                 radius,
             );
-            let next_point = self.problem.retraction(self.problem.get_point(), &step);
+            let next_point = self.problem.retraction(&step);
 
             let (next_value, next_grad) =
                 self.problem.function().compute_value_gradient(&next_point);
 
-            grad_norm = self.problem.norm(&next_point, self.problem.get_gradient());
+            grad_norm = self
+                .problem
+                .manifold()
+                .norm(&next_point, self.problem.get_gradient());
 
-            if self.problem.norm(self.problem.get_point(), &step) < self.min_step_size {
+            if self.problem.norm(&step) < self.min_step_size {
                 return RTRResult::new(
                     next_point,
                     self.problem.get_value(),
@@ -253,7 +253,7 @@ where
             if rho < R::from_f64(0.25).unwrap() {
                 radius = radius * R::from_f64(0.25).unwrap();
             } else if rho > R::from_f64(0.75).unwrap()
-                || (self.problem.norm(self.problem.get_point(), &step) - radius).abs_() == R::zero()
+                || (self.problem.norm(&step) - radius).abs_() == R::zero()
             {
                 radius = R::min(radius.muli(2), self.max_radius);
             }
