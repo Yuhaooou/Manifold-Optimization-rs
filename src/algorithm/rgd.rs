@@ -110,12 +110,12 @@ where
 
         self.problem.update_value_and_gradient(point);
 
-        let mut grad_norm = self.problem.norm(self.problem.get_gradient());
+        let mut grad_norm = self.problem.norm(self.problem.gradient());
 
         if grad_norm < self.min_grad_norm {
             return RGDResult {
-                final_value: self.problem.get_value(),
-                point: self.problem.return_point(),
+                final_value: self.problem.value(),
+                point: self.problem.take_point(),
                 final_grad_norm: grad_norm,
                 iters: 0,
                 status: Status::MinGradientNorm,
@@ -125,21 +125,21 @@ where
         for iter in 1..=self.max_iterations {
             let (alpha, next_point, _) = back_tracking(
                 &self.problem,
-                self.problem.get_point(),
-                self.problem.get_value(),
-                &self.problem.get_gradient().ref_neg(),
+                self.problem.point(),
+                self.problem.value(),
+                &self.problem.gradient().ref_neg(),
                 grad_norm.powi_(2),
                 &self.back_tracking_params,
             );
 
             self.problem.update_value_and_gradient(next_point);
 
-            grad_norm = self.problem.norm(self.problem.get_gradient());
+            grad_norm = self.problem.norm(self.problem.gradient());
 
             if alpha < self.min_step_size {
                 return RGDResult {
-                    final_value: self.problem.get_value(),
-                    point: self.problem.return_point(),
+                    final_value: self.problem.value(),
+                    point: self.problem.take_point(),
                     final_grad_norm: grad_norm,
                     iters: iter,
                     status: Status::MinStepSize,
@@ -148,8 +148,8 @@ where
 
             if grad_norm < self.min_grad_norm {
                 return RGDResult {
-                    final_value: self.problem.get_value(),
-                    point: self.problem.return_point(),
+                    final_value: self.problem.value(),
+                    point: self.problem.take_point(),
                     final_grad_norm: grad_norm,
                     iters: iter,
                     status: Status::MinGradientNorm,
@@ -160,7 +160,7 @@ where
                 println!(
                     "Iter: {}, Cost: {:.8e}, Grad Norm: {:.8e}, Step Size: {:.8e}",
                     iter,
-                    self.problem.get_value().to_f64().unwrap(),
+                    self.problem.value().to_f64().unwrap(),
                     grad_norm.to_f64().unwrap(),
                     alpha.to_f64().unwrap()
                 );
@@ -168,8 +168,8 @@ where
         }
 
         RGDResult {
-            final_value: self.problem.get_value(),
-            point: self.problem.return_point(),
+            final_value: self.problem.value(),
+            point: self.problem.take_point(),
             final_grad_norm: grad_norm,
             iters: self.max_iterations,
             status: Status::MaxIters,

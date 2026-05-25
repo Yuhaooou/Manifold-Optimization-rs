@@ -2,9 +2,6 @@ use std::mem::replace;
 
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold};
 
-// type FunctionWithGrad<M> =
-//     FuncGrad<M as Manifold, impl Fn(&M::Point, bool, bool) -> FunGradOutput<M>>;
-
 /// Only cost function, for zero-order algorithms.
 pub trait FuncZero {
     type Manifold: Manifold;
@@ -21,11 +18,11 @@ pub trait FuncZero {
         point: <Self::Manifold as Manifold>::Point,
     ) -> <Self::Manifold as Manifold>::Field;
 
-    fn get_value(&self) -> <Self::Manifold as Manifold>::Field;
+    fn value(&self) -> <Self::Manifold as Manifold>::Field;
 
-    fn get_point(&self) -> &<Self::Manifold as Manifold>::Point;
+    fn point(&self) -> &<Self::Manifold as Manifold>::Point;
 
-    fn return_point(&mut self) -> <Self::Manifold as Manifold>::Point {
+    fn take_point(&mut self) -> <Self::Manifold as Manifold>::Point {
         self.replace_value_point(None, None)
     }
 
@@ -51,12 +48,11 @@ pub trait FuncOne: FuncZero {
         point: <Self::Manifold as Manifold>::Point,
     ) -> <Self::Manifold as Manifold>::Field;
 
-    fn get_gradient(&self) -> &<Self::Manifold as Manifold>::TangentVector;
+    fn gradient(&self) -> &<Self::Manifold as Manifold>::TangentVector;
 
-    fn return_gradient(&mut self) -> <Self::Manifold as Manifold>::TangentVector;
+    fn take_gradient(&mut self) -> <Self::Manifold as Manifold>::TangentVector;
 
-    /// Directly compute gradient. May be less efficient if the struct already has the same point, but no guarantee.
-    fn directly_get_gradient(
+    fn compute_gradient(
         &self,
         point: &<Self::Manifold as Manifold>::Point,
     ) -> <Self::Manifold as Manifold>::TangentVector;
@@ -101,11 +97,11 @@ pub trait FuncTwo: FuncOne {
         v: <Self::Manifold as Manifold>::TangentVector,
     ) -> <Self::Manifold as Manifold>::Field;
 
-    fn get_hessian(&self) -> &<Self::Manifold as Manifold>::TangentVector;
+    fn hessian(&self) -> &<Self::Manifold as Manifold>::TangentVector;
 
-    fn return_hessian(&mut self) -> <Self::Manifold as Manifold>::TangentVector;
+    fn take_hessian(&mut self) -> <Self::Manifold as Manifold>::TangentVector;
 
-    fn directly_get_hessian(
+    fn compute_hessian(
         &self,
         x: &<Self::Manifold as Manifold>::Point,
         v: &<Self::Manifold as Manifold>::TangentVector,
@@ -160,11 +156,11 @@ where
         value
     }
 
-    fn get_value(&self) -> M::Field {
+    fn value(&self) -> M::Field {
         self.current_value.expect("Update first")
     }
 
-    fn get_point(&self) -> &M::Point {
+    fn point(&self) -> &M::Point {
         self.current_point.as_ref().expect("Point not contained")
     }
 
@@ -294,11 +290,11 @@ where
         value.expect("Error")
     }
 
-    fn get_value(&self) -> M::Field {
+    fn value(&self) -> M::Field {
         self.current_value.expect("Update first")
     }
 
-    fn get_point(&self) -> &M::Point {
+    fn point(&self) -> &M::Point {
         self.current_point.as_ref().expect("Point not contained")
     }
 
@@ -333,11 +329,11 @@ where
         value.expect("Error")
     }
 
-    fn get_gradient(&self) -> &M::TangentVector {
+    fn gradient(&self) -> &M::TangentVector {
         self.current_grad.as_ref().expect("Not eval yet")
     }
 
-    fn return_gradient(&mut self) -> M::TangentVector {
+    fn take_gradient(&mut self) -> M::TangentVector {
         self.current_grad.take().expect("Not eval yet")
     }
 
@@ -353,7 +349,7 @@ where
         (point, grad)
     }
 
-    fn directly_get_gradient(&self, x: &M::Point) -> M::TangentVector {
+    fn compute_gradient(&self, x: &M::Point) -> M::TangentVector {
         (self.fun_with_grad)(x, false, true).1.unwrap()
     }
 }
@@ -585,11 +581,11 @@ where
         value.expect("Error")
     }
 
-    fn get_value(&self) -> M::Field {
+    fn value(&self) -> M::Field {
         self.current_value.expect("Update first")
     }
 
-    fn get_point(&self) -> &M::Point {
+    fn point(&self) -> &M::Point {
         self.current_point.as_ref().expect("Point not contained")
     }
 
@@ -622,11 +618,11 @@ where
         value.expect("Error")
     }
 
-    fn get_gradient(&self) -> &M::TangentVector {
+    fn gradient(&self) -> &M::TangentVector {
         self.current_grad.as_ref().expect("update first")
     }
 
-    fn return_gradient(&mut self) -> M::TangentVector {
+    fn take_gradient(&mut self) -> M::TangentVector {
         self.current_grad.take().expect("update first")
     }
 
@@ -644,7 +640,7 @@ where
         (point, grad)
     }
 
-    fn directly_get_gradient(&self, x: &M::Point) -> M::TangentVector {
+    fn compute_gradient(&self, x: &M::Point) -> M::TangentVector {
         (self.fun_with_grad_hess)(x, None, false, true, false)
             .1
             .unwrap()
@@ -679,15 +675,15 @@ where
         value.expect("Error")
     }
 
-    fn get_hessian(&self) -> &M::TangentVector {
+    fn hessian(&self) -> &M::TangentVector {
         self.current_hess.as_ref().expect("update first")
     }
 
-    fn return_hessian(&mut self) -> M::TangentVector {
+    fn take_hessian(&mut self) -> M::TangentVector {
         self.current_hess.take().expect("update first")
     }
 
-    fn directly_get_hessian(&self, x: &M::Point, v: &M::TangentVector) -> M::TangentVector {
+    fn compute_hessian(&self, x: &M::Point, v: &M::TangentVector) -> M::TangentVector {
         (self.fun_with_grad_hess)(x, Some(v), false, false, true)
             .2
             .unwrap()

@@ -145,7 +145,7 @@ where
         }
 
         let subproblem_func = |s| {
-            let hs = self.problem.function().directly_get_hessian(point, s);
+            let hs = self.problem.function().compute_hessian(point, s);
             R::half() * self.problem.inner(s, &hs) - self.problem.inner(b, s)
         };
 
@@ -153,7 +153,7 @@ where
         let r_bound = b_norm * R::min(self.kappa, b_norm.powf_(self.theta));
 
         for iter in 1..=self.max_inner_iterations {
-            let hp = self.problem.function().directly_get_hessian(point, &p);
+            let hp = self.problem.function().compute_hessian(point, &p);
             let p_hp = self.problem.inner(&p, &hp);
             let alpha = self.problem.norm(&r).powi_(2) / p_hp;
             let v_next = v.ref_add(p.ref_mul_num(alpha));
@@ -191,12 +191,12 @@ where
 
         self.problem.update_value_and_gradient(init_point);
 
-        let mut grad_norm = self.problem.norm(self.problem.get_gradient());
+        let mut grad_norm = self.problem.norm(self.problem.gradient());
 
         if grad_norm < self.min_grad_norm {
-            let value = self.problem.get_value();
+            let value = self.problem.value();
             return RTRResult::new(
-                self.problem.function_mut().return_point(),
+                self.problem.function_mut().take_point(),
                 value,
                 grad_norm,
                 0,
@@ -206,8 +206,8 @@ where
 
         for iter in 1..=self.max_iterations {
             let (step, next_subproblem_value, inner_iters) = self.truncate_cg(
-                self.problem.get_point(),
-                &self.problem.get_gradient().ref_neg(),
+                self.problem.point(),
+                &self.problem.gradient().ref_neg(),
                 radius,
             );
             let next_point = self.problem.retraction(&step);
@@ -218,12 +218,12 @@ where
             grad_norm = self
                 .problem
                 .manifold()
-                .norm(&next_point, self.problem.get_gradient());
+                .norm(&next_point, self.problem.gradient());
 
             if self.problem.norm(&step) < self.min_step_size {
                 return RTRResult::new(
                     next_point,
-                    self.problem.get_value(),
+                    self.problem.value(),
                     grad_norm,
                     iter,
                     Status::MinStepSize,
@@ -240,7 +240,7 @@ where
                 );
             }
 
-            let rho = (self.problem.get_value() - next_value) / -next_subproblem_value;
+            let rho = (self.problem.value() - next_value) / -next_subproblem_value;
 
             if rho > self.threshold {
                 self.problem.function_mut().replace_value_point_gradient(
@@ -263,7 +263,7 @@ where
                     "Iter: {}, Inner iters: {}, Cost: {:.8e}, Grad Norm: {:.8e}, Radius: {:.8e}, rho: {:.4}",
                     iter,
                     inner_iters.map_or("max".to_string(), |x| x.to_string()),
-                    self.problem.get_value().to_f64().unwrap(),
+                    self.problem.value().to_f64().unwrap(),
                     grad_norm.to_f64().unwrap(),
                     radius.to_f64().unwrap(),
                     rho.to_f64().unwrap()
@@ -271,9 +271,9 @@ where
             }
         }
 
-        let value = self.problem.get_value();
+        let value = self.problem.value();
         RTRResult::new(
-            self.problem.return_point(),
+            self.problem.take_point(),
             value,
             grad_norm,
             self.max_iterations,
