@@ -42,18 +42,18 @@ where
     M::Point: std::fmt::Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RGDResult:\n")?;
-        write!(
+        writeln!(f, "RGDResult:")?;
+        writeln!(
             f,
-            "    final_value: {:.8e},\n",
+            "    final_value: {:.8e},",
             self.final_value.to_f64().unwrap()
         )?;
-        write!(
+        writeln!(
             f,
-            "    grad_norm: {:.8e},\n",
+            "    grad_norm: {:.8e},",
             self.final_grad_norm.to_f64().unwrap()
         )?;
-        write!(f, "    iterations: {}.\n", self.iters)?;
+        writeln!(f, "    iterations: {}.", self.iters)?;
         write!(f, "    status: {}.", self.status)
     }
 }

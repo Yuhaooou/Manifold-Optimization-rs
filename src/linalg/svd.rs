@@ -7,96 +7,96 @@ use crate::utils::tools::has_nan;
 
 use super::lapack::*;
 
-pub mod unused {
-    use super::*;
+// pub mod unused {
+//     use super::*;
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct Lgesvd {
-        jobu: LapackChar,
-        jobvt: LapackChar,
-    }
+//     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+//     pub struct Lgesvd {
+//         jobu: LapackChar,
+//         jobvt: LapackChar,
+//     }
 
-    impl Lgesvd {
-        pub fn new() -> Self {
-            Lgesvd {
-                jobu: LapackChar::A,
-                jobvt: LapackChar::A,
-            }
-        }
+//     impl Lgesvd {
+//         pub fn new() -> Self {
+//             Lgesvd {
+//                 jobu: LapackChar::A,
+//                 jobvt: LapackChar::A,
+//             }
+//         }
 
-        fn check_job(job: LapackChar) {
-            assert!(
-                matches!(
-                    job,
-                    LapackChar::A | LapackChar::S | LapackChar::O | LapackChar::N
-                ),
-                "Invalid job for gesvd"
-            )
-        }
+//         fn check_job(job: LapackChar) {
+//             assert!(
+//                 matches!(
+//                     job,
+//                     LapackChar::A | LapackChar::S | LapackChar::O | LapackChar::N
+//                 ),
+//                 "Invalid job for gesvd"
+//             )
+//         }
 
-        fn check_jobs_not_both_o(&self) {
-            assert!(
-                (self.jobu != LapackChar::O) || (self.jobvt != LapackChar::O),
-                "jobu and jobvt cannot be O at the same time for gesvd"
-            );
-        }
+//         fn check_jobs_not_both_o(&self) {
+//             assert!(
+//                 (self.jobu != LapackChar::O) || (self.jobvt != LapackChar::O),
+//                 "jobu and jobvt cannot be O at the same time for gesvd"
+//             );
+//         }
 
-        fn job_from_str(s: &str) -> LapackChar {
-            let job = LapackChar::from_str(s);
-            Self::check_job(job);
-            job
-        }
+//         fn job_from_str(s: &str) -> LapackChar {
+//             let job = LapackChar::from_str_(s);
+//             Self::check_job(job);
+//             job
+//         }
 
-        pub fn new_from_str(jobu_str: &str, jobvt_str: &str) -> Self {
-            let jobu = Self::job_from_str(jobu_str);
-            let jobvt = Self::job_from_str(jobvt_str);
-            let gesvd = Lgesvd { jobu, jobvt };
-            gesvd.check_jobs_not_both_o();
-            gesvd
-        }
+//         pub fn new_from_str(jobu_str: &str, jobvt_str: &str) -> Self {
+//             let jobu = Self::job_from_str(jobu_str);
+//             let jobvt = Self::job_from_str(jobvt_str);
+//             let gesvd = Lgesvd { jobu, jobvt };
+//             gesvd.check_jobs_not_both_o();
+//             gesvd
+//         }
 
-        pub fn jobu_from_str(mut self, jobu_str: &str) -> Self {
-            self.jobu = Self::job_from_str(jobu_str);
-            self.check_jobs_not_both_o();
-            self
-        }
+//         pub fn jobu_from_str(mut self, jobu_str: &str) -> Self {
+//             self.jobu = Self::job_from_str(jobu_str);
+//             self.check_jobs_not_both_o();
+//             self
+//         }
 
-        pub fn jobvt_from_str(mut self, jobvt_str: &str) -> Self {
-            self.jobvt = Self::job_from_str(jobvt_str);
-            self.check_jobs_not_both_o();
-            self
-        }
-    }
+//         pub fn jobvt_from_str(mut self, jobvt_str: &str) -> Self {
+//             self.jobvt = Self::job_from_str(jobvt_str);
+//             self.check_jobs_not_both_o();
+//             self
+//         }
+//     }
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct Lgesdd {
-        jobz: LapackChar,
-    }
+//     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+//     pub struct Lgesdd {
+//         jobz: LapackChar,
+//     }
 
-    impl Lgesdd {
-        pub fn new() -> Self {
-            Lgesdd {
-                jobz: LapackChar::A,
-            }
-        }
+//     impl Lgesdd {
+//         pub fn new() -> Self {
+//             Lgesdd {
+//                 jobz: LapackChar::A,
+//             }
+//         }
 
-        pub fn new_from_str(jobz_str: &str) -> Self {
-            let jobz = LapackChar::from_str(jobz_str);
-            Self::check_job(jobz);
-            Lgesdd { jobz }
-        }
+//         pub fn new_from_str(jobz_str: &str) -> Self {
+//             let jobz = LapackChar::from_str_(jobz_str);
+//             Self::check_job(jobz);
+//             Lgesdd { jobz }
+//         }
 
-        fn check_job(job: LapackChar) {
-            assert!(
-                matches!(
-                    job,
-                    LapackChar::A | LapackChar::S | LapackChar::O | LapackChar::N
-                ),
-                "Invalid job for gesdd"
-            )
-        }
-    }
-}
+//         fn check_job(job: LapackChar) {
+//             assert!(
+//                 matches!(
+//                     job,
+//                     LapackChar::A | LapackChar::S | LapackChar::O | LapackChar::N
+//                 ),
+//                 "Invalid job for gesdd"
+//             )
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SVDBackend {
@@ -122,7 +122,7 @@ impl Display for SVDBackend {
 }
 
 impl SVDBackend {
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_str_(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "GESVD" => SVDBackend::GESVD,
             "GESDD" => SVDBackend::GESDD,
@@ -135,6 +135,8 @@ impl SVDBackend {
     }
 }
 
+type SVDOutput<T1, T2> = (Array2<T1>, Array1<T2>, Array2<T1>);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SVDError {
     Unconverged,
@@ -146,7 +148,7 @@ fn thin_svd_owned_impl<T>(
     mut mat: Array2<T>,
     order: Layout,
     backend: SVDBackend,
-) -> Result<(Array2<T>, Array1<T::Real>, Array2<T>), SVDError>
+) -> Result<SVDOutput<T, T::Real>, SVDError>
 where
     T: LapackElem,
 {
@@ -202,8 +204,8 @@ where
             let lrwork = match T::IS_REAL {
                 true => 0,
                 false => {
-                    let mx = m.max(n) as usize;
-                    let mn = m.min(n) as usize;
+                    let mx = m.max(n);
+                    let mn = m.min(n);
                     if mx > 100 * mn {
                         5 * mn * mn + 5 * mn
                     } else {
@@ -262,12 +264,12 @@ fn thin_svd_owned<T>(
     mat: Array2<T>,
     backend: SVDBackend,
     order: Option<Layout>,
-) -> Result<(Array2<T>, Array1<T::Real>, Array2<T>), SVDError>
+) -> Result<SVDOutput<T, T::Real>, SVDError>
 where
     T: LapackElem,
 {
-    if order.is_some() {
-        thin_svd_owned_impl(mat, order.unwrap(), backend)
+    if let Some(value) = order {
+        thin_svd_owned_impl(mat, value, backend)
     } else if mat.t().is_standard_layout() {
         thin_svd_owned_impl(mat, Layout::F, backend)
     } else if mat.is_standard_layout() {
@@ -292,25 +294,22 @@ pub trait LinalgSVD {
     type Elem;
     type Real;
 
-    fn into_svd(self) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
+    fn into_svd(self) -> SVDOutput<Self::Elem, Self::Real>;
 
     fn into_svd_with_backend_order(
         self,
         backend: SVDBackend,
         order: Option<Layout>,
-    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
+    ) -> SVDOutput<Self::Elem, Self::Real>;
 
-    fn svd(
-        &self,
-        full_matrix: bool,
-    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
+    fn svd(&self, full_matrix: bool) -> SVDOutput<Self::Elem, Self::Real>;
 
     fn svd_with_backend_order(
         &self,
         full_matrix: bool,
         backend: SVDBackend,
         order: Option<Layout>,
-    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>);
+    ) -> SVDOutput<Self::Elem, Self::Real>;
 }
 
 impl<T> LinalgSVD for Array2<T>
@@ -321,7 +320,7 @@ where
     type Real = T::Real;
 
     /// This method will destroy the input matrix.
-    fn into_svd(self) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
+    fn into_svd(self) -> SVDOutput<Self::Elem, Self::Real> {
         self.into_svd_with_backend_order(SVDBackend::GESDD, None)
     }
 
@@ -329,14 +328,11 @@ where
         self,
         backend: SVDBackend,
         order: Option<Layout>,
-    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
+    ) -> SVDOutput<Self::Elem, Self::Real> {
         thin_svd_owned(self, backend, order).unwrap()
     }
 
-    fn svd(
-        &self,
-        full_matrix: bool,
-    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
+    fn svd(&self, full_matrix: bool) -> SVDOutput<Self::Elem, Self::Real> {
         self.svd_with_backend_order(full_matrix, SVDBackend::GESDD, None)
     }
 
@@ -345,7 +341,7 @@ where
         full_matrix: bool,
         backend: SVDBackend,
         order: Option<Layout>,
-    ) -> (Array2<Self::Elem>, Array1<Self::Real>, Array2<Self::Elem>) {
+    ) -> SVDOutput<Self::Elem, Self::Real> {
         if full_matrix {
             unimplemented!("Full SVD is not implemented yet")
         } else {

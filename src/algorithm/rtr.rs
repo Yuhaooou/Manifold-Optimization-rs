@@ -51,18 +51,18 @@ where
     M::Point: std::fmt::Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RTRResult:\n")?;
-        write!(
+        writeln!(f, "RTRResult:")?;
+        writeln!(
             f,
-            "    final_value: {:.8e},\n",
+            "    final_value: {:.8e},",
             self.final_value.to_f64().unwrap()
         )?;
-        write!(
+        writeln!(
             f,
-            "    final_grad_norm: {:.8e},\n",
+            "    final_grad_norm: {:.8e},",
             self.final_grad_norm.to_f64().unwrap()
         )?;
-        write!(f, "    iterations: {}.\n", self.iters)?;
+        writeln!(f, "    iterations: {}.", self.iters)?;
         write!(f, "    status: {}.", self.status)
     }
 }
@@ -182,7 +182,7 @@ where
         }
 
         let subproblem_value = subproblem_func(&v);
-        return (v, subproblem_value, None);
+        (v, subproblem_value, None)
     }
 
     /// Run trust-region optimization from the problem's initial point.
@@ -251,7 +251,7 @@ where
             }
 
             if rho < R::from_f64(0.25).unwrap() {
-                radius = radius * R::from_f64(0.25).unwrap();
+                radius *= R::from_f64(0.25).unwrap();
             } else if rho > R::from_f64(0.75).unwrap()
                 || (self.problem.norm(&step) - radius).abs_() == R::zero()
             {

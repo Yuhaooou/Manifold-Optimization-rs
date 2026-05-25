@@ -2,6 +2,9 @@ use std::mem::replace;
 
 use crate::manifolds::{EGradToRGrad, EHessToRHess, Manifold};
 
+// type FunctionWithGrad<M> =
+//     FuncGrad<M as Manifold, impl Fn(&M::Point, bool, bool) -> FunGradOutput<M>>;
+
 /// Only cost function, for zero-order algorithms.
 pub trait FuncZero {
     type Manifold: Manifold;
@@ -78,17 +81,19 @@ pub trait FuncOne: FuncZero {
     );
 }
 
+type ValueGradHess<M> = (
+    <M as Manifold>::Field,
+    <M as Manifold>::TangentVector,
+    <M as Manifold>::TangentVector,
+);
+
 /// Cost function, gradient and hessian, for second-order algorithms.
 pub trait FuncTwo: FuncOne {
     fn compute_value_gradient_hessian(
         &mut self,
         x: &<Self::Manifold as Manifold>::Point,
         v: &<Self::Manifold as Manifold>::TangentVector,
-    ) -> (
-        <Self::Manifold as Manifold>::Field,
-        <Self::Manifold as Manifold>::TangentVector,
-        <Self::Manifold as Manifold>::TangentVector,
-    );
+    ) -> ValueGradHess<Self::Manifold>;
 
     fn update_value_gradient_hessian(
         &mut self,
@@ -176,7 +181,7 @@ where
 pub struct FuncGrad<M, F>
 where
     M: Manifold,
-    F: Fn(&M::Point, bool, bool) -> (Option<M::Field>, Option<M::TangentVector>),
+    F: Fn(&M::Point, bool, bool) -> FunGradOutput<M>,
 {
     manifold: M,
     fun_with_grad: F,
@@ -185,10 +190,15 @@ where
     current_grad: Option<M::TangentVector>,
 }
 
+type FunGradOutput<M> = (
+    Option<<M as Manifold>::Field>,
+    Option<<M as Manifold>::TangentVector>,
+);
+
 impl<M, F> FuncGrad<M, F>
 where
     M: Manifold,
-    F: Fn(&M::Point, bool, bool) -> (Option<M::Field>, Option<M::TangentVector>),
+    F: Fn(&M::Point, bool, bool) -> FunGradOutput<M>,
 {
     pub fn new(manifold: M, fun_with_grad: F) -> Self {
         FuncGrad {
@@ -204,8 +214,7 @@ where
         manifold: M,
         function: impl Fn(&M::Point) -> M::Field,
         gradient: impl Fn(&M::Point) -> M::TangentVector,
-    ) -> FuncGrad<M, impl Fn(&M::Point, bool, bool) -> (Option<M::Field>, Option<M::TangentVector>)>
-    {
+    ) -> FuncGrad<M, impl Fn(&M::Point, bool, bool) -> FunGradOutput<M>> {
         let fun_with_grad = move |x: &M::Point, compute_cost: bool, compute_grad: bool| {
             let value = if compute_cost {
                 Some(function(x))
@@ -233,14 +242,13 @@ where
 impl<M, F> FuncGrad<M, F>
 where
     M: Manifold + EGradToRGrad,
-    F: Fn(&M::Point, bool, bool) -> (Option<M::Field>, Option<M::TangentVector>),
+    F: Fn(&M::Point, bool, bool) -> FunGradOutput<M>,
 {
     pub fn new_with_fun_egrad(
         manifold: M,
         function: impl Fn(&M::Point) -> M::Field,
         egradient: impl Fn(&M::Point) -> M::AmbientPoint,
-    ) -> FuncGrad<M, impl Fn(&M::Point, bool, bool) -> (Option<M::Field>, Option<M::TangentVector>)>
-    {
+    ) -> FuncGrad<M, impl Fn(&M::Point, bool, bool) -> FunGradOutput<M>> {
         let manifold_ = manifold.clone();
         let fun_with_grad = move |x: &M::Point, compute_cost: bool, compute_grad: bool| {
             let value = if compute_cost {
@@ -270,7 +278,7 @@ where
 impl<M, F> FuncZero for FuncGrad<M, F>
 where
     M: Manifold,
-    F: Fn(&M::Point, bool, bool) -> (Option<M::Field>, Option<M::TangentVector>),
+    F: Fn(&M::Point, bool, bool) -> FunGradOutput<M>,
 {
     type Manifold = M;
 
@@ -310,10 +318,10 @@ where
 impl<M, F> FuncOne for FuncGrad<M, F>
 where
     M: Manifold,
-    F: Fn(&M::Point, bool, bool) -> (Option<M::Field>, Option<M::TangentVector>),
+    F: Fn(&M::Point, bool, bool) -> FunGradOutput<M>,
 {
     fn compute_value_gradient(&self, x: &M::Point) -> (M::Field, M::TangentVector) {
-        let (value, grad) = (self.fun_with_grad)(&x, true, true);
+        let (value, grad) = (self.fun_with_grad)(x, true, true);
         (value.expect("Error"), grad.expect("Error"))
     }
 
@@ -330,7 +338,7 @@ where
     }
 
     fn return_gradient(&mut self) -> M::TangentVector {
-        replace(&mut self.current_grad, None).expect("Not eval yet")
+        self.current_grad.take().expect("Not eval yet")
     }
 
     fn replace_value_point_gradient(
@@ -363,10 +371,25 @@ where
     current_hess: Option<M::TangentVector>,
 }
 
-impl<M, F> FuncGradHess<M, F>
+pub trait FuncGradHessBundle<M: Manifold>:
+    Fn(
+    &M::Point,
+    Option<&M::TangentVector>,
+    bool,
+    bool,
+    bool,
+) -> (
+    Option<M::Field>,
+    Option<M::TangentVector>,
+    Option<M::TangentVector>,
+)
+{
+}
+
+impl<T, M> FuncGradHessBundle<M> for T
 where
     M: Manifold,
-    F: Fn(
+    T: Fn(
         &M::Point,
         Option<&M::TangentVector>,
         bool,
@@ -377,6 +400,13 @@ where
         Option<M::TangentVector>,
         Option<M::TangentVector>,
     ),
+{
+}
+
+impl<M, F> FuncGradHess<M, F>
+where
+    M: Manifold,
+    F: FuncGradHessBundle<M>,
 {
     pub fn new(manifold: M, fun_with_grad_hess: F) -> Self {
         FuncGradHess {
@@ -395,20 +425,7 @@ where
         function: impl Fn(&M::Point) -> M::Field,
         gradient: impl Fn(&M::Point) -> M::TangentVector,
         hessian: impl Fn(&M::Point, &M::TangentVector) -> M::TangentVector,
-    ) -> FuncGradHess<
-        M,
-        impl Fn(
-            &M::Point,
-            Option<&M::TangentVector>,
-            bool,
-            bool,
-            bool,
-        ) -> (
-            Option<M::Field>,
-            Option<M::TangentVector>,
-            Option<M::TangentVector>,
-        ),
-    > {
+    ) -> FuncGradHess<M, impl FuncGradHessBundle<M>> {
         let fun_with_grad_hess = move |x: &M::Point,
                                        v: Option<&M::TangentVector>,
                                        compute_cost: bool,
@@ -451,20 +468,7 @@ where
     pub fn new_from_ambient<F1>(
         manifold: M,
         fun_with_egrad_ehess: F1,
-    ) -> FuncGradHess<
-        M,
-        impl Fn(
-            &M::Point,
-            Option<&M::TangentVector>,
-            bool,
-            bool,
-            bool,
-        ) -> (
-            Option<M::Field>,
-            Option<M::TangentVector>,
-            Option<M::TangentVector>,
-        ),
-    >
+    ) -> FuncGradHess<M, impl FuncGradHessBundle<M>>
     where
         F1: Fn(
             &M::Point,
@@ -513,20 +517,7 @@ where
         function: impl Fn(&M::Point) -> M::Field,
         egradient: impl Fn(&M::Point) -> M::AmbientPoint,
         ehessian: impl Fn(&M::Point, &M::TangentVector) -> M::AmbientPoint,
-    ) -> FuncGradHess<
-        M,
-        impl Fn(
-            &M::Point,
-            Option<&M::TangentVector>,
-            bool,
-            bool,
-            bool,
-        ) -> (
-            Option<M::Field>,
-            Option<M::TangentVector>,
-            Option<M::TangentVector>,
-        ),
-    > {
+    ) -> FuncGradHess<M, impl FuncGradHessBundle<M>> {
         let manifold_ = manifold.clone();
         let fun_with_grad_hess = move |x: &M::Point,
                                        v: Option<&M::TangentVector>,
@@ -570,17 +561,7 @@ where
 impl<M, F> FuncZero for FuncGradHess<M, F>
 where
     M: Manifold,
-    F: Fn(
-        &M::Point,
-        Option<&M::TangentVector>,
-        bool,
-        bool,
-        bool,
-    ) -> (
-        Option<M::Field>,
-        Option<M::TangentVector>,
-        Option<M::TangentVector>,
-    ),
+    F: FuncGradHessBundle<M>,
 {
     type Manifold = M;
 
@@ -624,20 +605,10 @@ where
 impl<M, F> FuncOne for FuncGradHess<M, F>
 where
     M: Manifold,
-    F: Fn(
-        &M::Point,
-        Option<&M::TangentVector>,
-        bool,
-        bool,
-        bool,
-    ) -> (
-        Option<M::Field>,
-        Option<M::TangentVector>,
-        Option<M::TangentVector>,
-    ),
+    F: FuncGradHessBundle<M>,
 {
     fn compute_value_gradient(&self, x: &M::Point) -> (M::Field, M::TangentVector) {
-        let (value, grad, _) = (self.fun_with_grad_hess)(&x, None, true, true, false);
+        let (value, grad, _) = (self.fun_with_grad_hess)(x, None, true, true, false);
         (value.expect("Error"), grad.expect("Error"))
     }
 
@@ -656,7 +627,7 @@ where
     }
 
     fn return_gradient(&mut self) -> M::TangentVector {
-        replace(&mut self.current_grad, None).expect("update first")
+        self.current_grad.take().expect("update first")
     }
 
     fn replace_value_point_gradient(
@@ -683,17 +654,7 @@ where
 impl<M, F> FuncTwo for FuncGradHess<M, F>
 where
     M: Manifold,
-    F: Fn(
-        &M::Point,
-        Option<&M::TangentVector>,
-        bool,
-        bool,
-        bool,
-    ) -> (
-        Option<M::Field>,
-        Option<M::TangentVector>,
-        Option<M::TangentVector>,
-    ),
+    F: FuncGradHessBundle<M>,
 {
     fn compute_value_gradient_hessian(
         &mut self,
@@ -719,11 +680,11 @@ where
     }
 
     fn get_hessian(&self) -> &M::TangentVector {
-        &self.current_hess.as_ref().expect("update first")
+        self.current_hess.as_ref().expect("update first")
     }
 
     fn return_hessian(&mut self) -> M::TangentVector {
-        replace(&mut self.current_hess, None).expect("update first")
+        self.current_hess.take().expect("update first")
     }
 
     fn directly_get_hessian(&self, x: &M::Point, v: &M::TangentVector) -> M::TangentVector {

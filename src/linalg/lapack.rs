@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments, clippy::useless_transmute)]
+
 use std::{ffi::c_char, mem::transmute, ptr::null_mut};
 
 use lapack_sys::{__BindgenComplex as LapackComplex, *};
@@ -35,7 +37,7 @@ impl LapackChar {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_str_(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "a" => LapackChar::A,
             "s" => LapackChar::S,
@@ -75,6 +77,8 @@ pub fn to_lapack_complex<T: Copy>(c: &Complex<T>) -> LapackComplex<T> {
     LapackComplex { re: c.re, im: c.im }
 }
 
+#[allow(clippy::uninit_vec)]
+// TODO
 pub(crate) fn new_uninit_vec<T>(len: usize) -> Vec<T> {
     let mut vec = Vec::with_capacity(len);
     unsafe { vec.set_len(len) };

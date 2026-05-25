@@ -131,7 +131,7 @@ where
         point: &Self::Point,
         egrad: &Self::AmbientPoint,
     ) -> Self::TangentVector {
-        self.projection(point, &egrad)
+        self.projection(point, egrad)
     }
 }
 
@@ -287,7 +287,7 @@ where
     }
 }
 
-impl<'a, D> Add<&'a TangentVector<D>> for TangentVector<D>
+impl<D> Add<&TangentVector<D>> for TangentVector<D>
 where
     D: RCLike,
 {
@@ -309,7 +309,7 @@ where
     }
 }
 
-impl<'a, D> Sub<&'a TangentVector<D>> for TangentVector<D>
+impl<D> Sub<&TangentVector<D>> for TangentVector<D>
 where
     D: RCLike,
 {
